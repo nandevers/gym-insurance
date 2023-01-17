@@ -1,11 +1,15 @@
 import math
+import numpy as np
 from collections import defaultdict
 
 
 class ABenford(object):
-    def __init__(self, digit_length):
+    def __init__(self, digit_length, threshold):
         self.digit_length = digit_length
-        self.observed = defaultdict(int)
+        self.threshold = threshold
+        self._variance = defaultdict(int)
+        self._inference = defaultdict(int)
+        self._inference_bool = defaultdict(int)
         self.n = defaultdict(int)
 
     def compute_observed_frequencies(self, data):
@@ -20,8 +24,10 @@ class ABenford(object):
         """
         observed_frequencies = defaultdict(int)
         for number in data:
-            for i in range(1, len(str(number)) + 1):
-                observed_frequencies[str(number)[:i]] += 1
+            n = str(number)
+            for i in range(1, len(n) + 1):
+                if len(n) == i:
+                    observed_frequencies[str(number)[:i]] += 1
         return observed_frequencies
 
     def compute_expected_frequencies(self, data):
@@ -42,15 +48,19 @@ class ABenford(object):
         observed_frequencies = self.compute_observed_frequencies(data)
         expected_frequencies = defaultdict(int)
 
-        max_length = [len(str(o)) for o in observed_frequencies.keys()]
-        max_length = max((int(m) for m in max_length))+1
+        length = [len(str(o)) for o in observed_frequencies.keys()]
+        min_length = min(int(l) for l in length)
+        max_length = max((int(l) for l in length)) + 1
 
-        for i in range(1, max_length):
+        for i in range(min_length, max_length):
             print(f"Calculating for {i}")
             self.observations = [
                 o[0] for o in observed_frequencies.items() if len(str(o[0])) == i
             ]
-            self.n[i] = len(self.observations)
+
+            self.n[i] = sum(
+                [o[1] for o in observed_frequencies.items() if len(str(o[0])) == i]
+            )
 
             # Step 2: Count the frequency of each leading digit sequence
             inner = [
@@ -63,8 +73,7 @@ class ABenford(object):
             # Step 3: Compute the expected frequencies of each leading digit sequence
             for o in observed_frequencies:
                 if len(str(o)) == i:
-                    self.observed[o] = observed_frequencies[o]
-                    expected_frequencies[o] = c[i] * math.log10(1 + 1 / int(o))
+                    expected_frequencies[o] = c[i] * math.log10(1 + 1 / int(o)) * int(o)
 
         self.observed_frequencies = observed_frequencies
         self.expected_frequencies = expected_frequencies
@@ -72,7 +81,6 @@ class ABenford(object):
 
         return (
             c,
-            self.observed,
             self.observed_frequencies,
             self.n,
             self.expected_frequencies,
@@ -100,8 +108,6 @@ class ABenford(object):
         Returns:
             float: the variance value
         """
-        self._variance = defaultdict(int)
-        self._inference = defaultdict(int)
         for i in range(0, 9):
             of = [
                 int(o[1])
@@ -116,5 +122,8 @@ class ABenford(object):
                     [(o - e) ** 2 / self.n[i] for o, e in zip(of, ef)]
                 )
                 self._inference[i] = [
-                    (o - e) / self._variance[i] for o, e in zip(of, ef)
+                    (o - e) / np.sqrt(self._variance[i]) for o, e in zip(of, ef)
+                ]
+                self._inference_bool[i] = [
+                    self.threshold < v for v in self._inference[i]
                 ]

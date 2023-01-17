@@ -8,30 +8,21 @@ from keras.optimizers import adam_v2
 from rl.agents import DQNAgent
 from rl.memory import SequentialMemory
 
-from gym_insurance import InsurEnv
+from gym_insurance.envs.insurenv import InsurEnv
 from handle_data import dump, load
 
 assert load_dotenv()
 import numpy as np
 
-data = load("Train Set", RAW=False)
-cols = [
-    "nr_previous_proposals",
-    f"max_{'nr_produtividade_estimada'}",
-    f"min_{'nr_produtividade_estimada'}",
-    f"min_{'vl_limite_garantia'}",
-    f"max_{'vl_limite_garantia'}",
-    "first_digit",
-    "second_digit",
-]
+data = pd.read_csv("../DeFraud/data/processed/psr_train_set.csv")
 
+# not fill the mean, leave missing
+data = data.query("valor_indenização!=1147131.5")
 env = InsurEnv(
     data=data,
-    id_col=["nr_documento_segurado", "nr_proposta"],
     value_column="valor_indenização",
-    state_columns=cols,
+    state_columns=data.columns[5:-1].to_list(),
     budget=100000,
-    time_col=None,
 )
 
 env.reset()

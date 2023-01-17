@@ -1,73 +1,13 @@
 import time
-
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from bf2 import benfordslaw as bfl
 from gym import Env, spaces
-from keras.callbacks import TensorBoard
+from gym_insurance.envs.abenford import ABenford
+from gym_insurance.envs.benford import Benford
+from gym_insurance.envs.utils import Wallet, ModifiedTensorBoard
 
-
-MODEL_NAME = "insurance_dqn"
-
-# Own Tensorboard class
-class ModifiedTensorBoard(TensorBoard):
-
-    # Overriding init to set initial step and writer (we want one log file for all .fit() calls)
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.step = 1
-        self.writer = tf.summary.create_file_writer(self.log_dir)
-
-    # Overriding this method to stop creating default log writer
-    def set_model(self, model):
-        pass
-
-    # Overrided, saves logs with our step number
-    # (otherwise every .fit() will start writing from 0th step)
-    def on_epoch_end(self, epoch, logs=None):
-        self.update_stats(**logs)
-
-    # Overrided
-    # We train for one batch only, no need to save anything at epoch end
-    def on_batch_end(self, batch, logs=None):
-        pass
-
-    # Overrided, so won't close writer
-    def on_train_end(self, _):
-        pass
-
-    # Custom method for saving own metrics
-    # Creates writer, writes custom metrics and closes writer
-    def update_stats(self, **stats):
-        self._write_logs(stats, self.step)
-
-    def _write_logs(self, logs, index):
-        with self.writer.as_default():
-            for name, value in logs.items():
-                tf.summary.scalar(name, value, step=index)
-                self.step += 1
-                self.writer.flush()
-
-
-class Wallet:
-    def __init__(self, budget) -> None:
-        self.budget = budget
-        self.pct_budget = 0
-        self.decisions = {}
-        self.spent = 0
-
-    def withdraw(self, value):
-        assert value > 0
-        self.spent += value
-        if self.pct_budget <= 1:
-            self.pct_budget = self.spent / self.budget
-        else:
-            raise ValueError
-
-    @property
-    def balance(self):
-        return self.budget - self.spent
+MODEL_NAME = "br_crop_insurance"
 
 
 class InsurEnv(Env):
@@ -172,9 +112,9 @@ class InsurEnv(Env):
             else:
                 reward = -100
 
-            self.move_state()
-            self.rewards.append(reward)
-            info = {}
+        self.move_state()
+        self.rewards.append(reward)
+        info = {}
         return observation, reward, self.done, info
 
     def move_state(self):
@@ -198,13 +138,4 @@ class InsurEnv(Env):
             return 0
         wc = self.benford_dist()
         woc = self.benford_dist(previous=True)
-        if wc <= woc:
-            if action == 0:
-                return wc
-            else:
-                return -wc
-        else:
-            if action == 0:
-                return -wc
-            else:
-                return wc
+        return wc if wc <= woc else -wc if action == 0 else wc
