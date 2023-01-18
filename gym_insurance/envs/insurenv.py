@@ -1,9 +1,7 @@
 import time
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from gym import Env, spaces
-from gym_insurance.envs.abenford import ABenford
 from gym_insurance.envs.benford import Benford
 from gym_insurance.envs.utils import Wallet, ModifiedTensorBoard
 
@@ -89,13 +87,22 @@ class InsurEnv(Env):
                 try:
                     self.budget.decisions[self.current_case] = 1
                     self.budget.withdraw(vl)
-                    self.done = False
                     reward = self._reward(action)
+                    self.done = False
 
                 except ValueError:
                     observation = self.states[-1]
                     self.done = True
                     self.episodes += 1
+
+                    self.tensorboard.update_stats(
+                        reward=sum(self.rewards),
+                        min_reward=min(self.rewards),
+                        approved_pct=self.approved_pct,
+                        budget_pct=self.budget.pct_budget,
+                        episodes=self.episodes,
+                        step=self.steps,
+                    )
                     reward = 0
             else:
                 self.budget.decisions[self.current_case] = 0
@@ -114,7 +121,9 @@ class InsurEnv(Env):
 
         self.move_state()
         self.rewards.append(reward)
+        self.approved_pct = sum(self.budget.decisions.values()) / self.steps
         info = {}
+
         return observation, reward, self.done, info
 
     def move_state(self):

@@ -5,14 +5,14 @@ from keras.callbacks import TensorBoard
 class Wallet:
     def __init__(self, budget) -> None:
         self.budget = budget
-        self.pct_budget = 0
+        self.pct_budget = 1
         self.decisions = {}
         self.spent = 0
 
     def withdraw(self, value):
         assert value > 0
         self.spent += value
-        if self.pct_budget <= 1:
+        if self.pct_budget <= 1 and self.spent<=self.budget:
             self.pct_budget = self.spent / self.budget
         else:
             raise ValueError
@@ -23,6 +23,8 @@ class Wallet:
 
 
 # Own Tensorboard class
+
+# Own Tensorboard class
 class ModifiedTensorBoard(TensorBoard):
 
     # Overriding init to set initial step and writer (we want one log file for all .fit() calls)
@@ -30,6 +32,7 @@ class ModifiedTensorBoard(TensorBoard):
         super().__init__(**kwargs)
         self.step = 1
         self.writer = tf.summary.create_file_writer(self.log_dir)
+        self.writer.set_as_default()
 
     # Overriding this method to stop creating default log writer
     def set_model(self, model):
@@ -49,14 +52,7 @@ class ModifiedTensorBoard(TensorBoard):
     def on_train_end(self, _):
         pass
 
-    # Custom method for saving own metrics
-    # Creates writer, writes custom metrics and closes writer
-    def update_stats(self, **stats):
-        self._write_logs(stats, self.step)
-
-    def _write_logs(self, logs, index):
+    def update_stats(self,step, **logs):
         with self.writer.as_default():
-            for name, value in logs.items():
-                tf.summary.scalar(name, value, step=index)
-                self.step += 1
-                self.writer.flush()
+            for log in logs.items():
+                tf.summary.scalar(log[0],log[1], step=step)
