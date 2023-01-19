@@ -100,8 +100,7 @@ class InsurEnv(Env):
                         min_reward=min(self.rewards),
                         approved_pct=self.approved_pct,
                         budget_pct=self.budget.pct_budget,
-                        episodes=self.episodes,
-                        step=self.steps,
+                        step=self.episodes,
                     )
                     reward = 0
             else:
@@ -148,3 +147,8 @@ class InsurEnv(Env):
         wc = self.benford_dist()
         woc = self.benford_dist(previous=True)
         return wc if wc <= woc else -wc if action == 0 else wc
+
+
+    @property
+    def results(self):
+        return self.budget.decisions
