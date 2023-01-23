@@ -6,7 +6,7 @@ from keras.callbacks import TensorBoard
 class Wallet:
     def __init__(self, budget) -> None:
         self.budget = budget
-        self.pct_budget = 1
+        self.pct_budget = 0
         self.decisions = {}
         self.spent = 0
 
@@ -32,19 +32,23 @@ class ModifiedTensorBoard(TensorBoard):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.step = 1
+        self._should_write_train_graph  = True
         self.writer = tf.summary.create_file_writer(self.log_dir)
         self.writer.set_as_default()
 
     # Overriding this method to stop creating default log writer
     def set_model(self, model):
-        self.model = model
+#        self.model = model
+#        self._train_dir = os.path.join(self.log_dir, 'models/train')
+#        self._train_step = self.model._train_counter
+         pass
 
-        self._train_dir = os.path.join(self.log_dir, 'train')
-        self._train_step = self.model._train_counter
+#        self._val_dir = os.path.join(self.log_dir, 'models/validation')
+#        self._val_step = self.model._test_counter
 
-        self._val_dir = os.path.join(self.log_dir, 'validation')
-        self._val_step = self.model._test_counter
-
+    def on_train_begin(self, *args, **kwargs):
+        super(TensorBoard, self).on_train_begin(*args, **kwargs)
+        tf.summary.experimental.set_step(self._train_step)
 
     # Overrided, saves logs with our step number
     # (otherwise every .fit() will start writing from 0th step)
@@ -60,7 +64,11 @@ class ModifiedTensorBoard(TensorBoard):
     def on_train_end(self, _):
         pass
 
-    def update_stats(self,step, **logs):
+    def update_stats(self, step = None, **logs):
         with self.writer.as_default():
             for log in logs.items():
-                tf.summary.scalar(log[0],log[1], step=step)
+                key = log[0]
+                value = log[1]
+                if isinstance(log[1], list):
+                    value = log[1][0]
+                tf.summary.scalar(key, value, step=step)

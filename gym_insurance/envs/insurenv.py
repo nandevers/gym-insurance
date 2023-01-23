@@ -6,6 +6,8 @@ from gym_insurance.envs.benford import Benford
 from gym_insurance.envs.utils import Wallet, ModifiedTensorBoard
 
 MODEL_NAME = "br_crop_insurance"
+MIN_REWARD = -200
+EPISODES = 2
 
 
 class InsurEnv(Env):
@@ -29,31 +31,25 @@ class InsurEnv(Env):
         # Shuffle data
         self.sampled_idx = list(self.data.sample(frac=1).index)
 
-        self.tensorboard = ModifiedTensorBoard(
-            log_dir=f"logs/{MODEL_NAME}-{int(time.time())}"
-        )
-        self.ACTION_SPACE_SIZE = 3
-
     def _zero_array(self):
         return np.zeros(len(self.state_columns) + 2)
 
-    def reset(self):
-        return self._reset()
-
     def _reset(self):
         self.steps = 0
-        self.current_case = self.sampled_idx[self.steps]
         self.states = []
         self.rewards = []
         self.done = False
+
+        self.current_case = self.sampled_idx[self.steps]
         self.budget = Wallet(self.budget.budget)
-        # All attributes which define the space as well as the metrics pct_budget and percenteage approved
         self.observation_space = np.zeros(len(self.state_columns) + 2)
-        # Pick initial state
         self.initial_state = self.data.loc[
             self.sampled_idx[0], self.state_columns
         ].values
         return self.observation_space
+
+    def reset(self):
+        return self._reset()
 
     @property
     def state(self):
@@ -85,8 +81,8 @@ class InsurEnv(Env):
         if vl is not None:
             if action == 1 and self.done is False:
                 try:
-                    self.budget.decisions[self.current_case] = 1
                     self.budget.withdraw(vl)
+                    self.budget.decisions[self.current_case] = 1
                     reward = self._reward(action)
                     self.done = False
 
@@ -95,14 +91,8 @@ class InsurEnv(Env):
                     self.done = True
                     self.episodes += 1
 
-                    self.tensorboard.update_stats(
-                        reward=sum(self.rewards),
-                        min_reward=min(self.rewards),
-                        approved_pct=self.approved_pct,
-                        budget_pct=self.budget.pct_budget,
-                        step=self.episodes,
-                    )
                     reward = 0
+
             else:
                 self.budget.decisions[self.current_case] = 0
                 if self.budget.pct_budget <= 1:
@@ -111,9 +101,16 @@ class InsurEnv(Env):
                 else:
                     self.done = True
                     self.episodes += 1
+                    self.tensorboard.update_stats(
+                        step=self.episodes,
+                        reward=sum(self.rewards),
+                        min_reward=min(self.rewards),
+                        approved_pct=self.approved_pct,
+                        budget_pct=self.budget.pct_budget,
+                    )
                     reward = 0
         else:
-            if action == 3:
+            if action == 2:
                 reward = 100
             else:
                 reward = -100
@@ -148,7 +145,8 @@ class InsurEnv(Env):
         woc = self.benford_dist(previous=True)
         return wc if wc <= woc else -wc if action == 0 else wc
 
-
     @property
     def results(self):
-        return self.budget.decisions
+        results_data = pd.DataFrame(self.budget.decisions, index=[0]).T
+        results_data.columns = ["decision"]
+        return results_data.join(self.data)
