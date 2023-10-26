@@ -52,7 +52,7 @@ class ModifiedTensorBoard(TensorBoard):
 
 class Wallet:
     def __init__(self, budget) -> None:
-        self.budget = budget
+        self._budget = budget
         self.pct_budget = 0
         self.decisions = {}
         self.current_budget = []
@@ -61,15 +61,15 @@ class Wallet:
     def withdraw(self, value):
         assert value > 0
         self.spent += value
-        self.current_budget.append(self.budget - self.spent)
+        self.current_budget.append(self._budget - self.spent)
         if self.pct_budget <= 1:
-            self.pct_budget = self.spent / self.budget
+            self.pct_budget = self.spent / self._budget
         else:
             raise ValueError
 
     @property
     def balance(self):
-        return self.budget - self.spent
+        return self._budget - self.spent
 
 
 class InsurEnv(Env):
@@ -81,17 +81,17 @@ class InsurEnv(Env):
         budget: int,
     ) -> None:
         super().__init__()
-        self.data = data
-        self.value_column = value_column
-        self.state_columns = state_columns
-        self.budget = Wallet(budget)
+        self._data = data
+        self._value_column = value_column
+        self._state_columns = state_columns
+        self._budget = Wallet(budget)
         self.episodes = 0
 
         # Action space should have either approve, reject or do nothing
         self.action_space = spaces.Discrete(3)
 
         # Shuffle data
-        self.sampled_idx = list(self.data.sample(frac=1).index)
+        self.sampled_idx = list(self._data.sample(frac=1).index)
 
         self.tensorboard = ModifiedTensorBoard(
             log_dir=f"logs/{MODEL_NAME}-{int(time.time())}"
@@ -99,7 +99,7 @@ class InsurEnv(Env):
         self.ACTION_SPACE_SIZE = 3
 
     def _zero_array(self):
-        return np.zeros(len(self.state_columns) + 2)
+        return np.zeros(len(self._state_columns) + 2)
 
     def reset(self):
         return self._reset()
@@ -110,25 +110,25 @@ class InsurEnv(Env):
         self.states = []
         self.rewards = []
         self.done = False
-        self.budget = Wallet(self.budget.budget)
+        self._budget = Wallet(self._budget.budget)
         # All attributes which define the space as well as the metrics pct_budget and percenteage approved
-        self.observation_space = np.zeros(len(self.state_columns) + 2)
+        self.observation_space = np.zeros(len(self._state_columns) + 2)
         # Pick initial state
-        self.initial_state = self.data.loc[
-            self.sampled_idx[0], self.state_columns
+        self.initial_state = self._data.loc[
+            self.sampled_idx[0], self._state_columns
         ].values
         return self.observation_space
 
     @property
     def state(self):
-        cols = self.state_columns
+        cols = self._state_columns
         _values = list(*self.case[cols].values)
-        if self.budget.spent == 0:
+        if self._budget.spent == 0:
             return np.array(_values + [0.0, 0.0])
-        elif self.budget.pct_budget <= 1:
-            self.approved = sum(self.budget.decisions.values())
+        elif self._budget.pct_budget <= 1:
+            self.approved = sum(self._budget.decisions.values())
             return np.array(
-                _values + [self.budget.pct_budget, self.approved / self.steps]
+                _values + [self._budget.pct_budget, self.approved / self.steps]
             )
         else:
             return self._zero_array()
@@ -136,7 +136,7 @@ class InsurEnv(Env):
     @property
     def case(self):
         self.current_case = self.sampled_idx[self.steps]
-        _case = self.data.filter(items=[self.current_case], axis=0)
+        _case = self._data.filter(items=[self.current_case], axis=0)
         if _case.shape[0] > 1:
             raise ValueError
         else:
@@ -149,8 +149,8 @@ class InsurEnv(Env):
         if vl is not None:
             if action == 1 and self.done is False:
                 try:
-                    self.budget.decisions[self.current_case] = 1
-                    self.budget.withdraw(vl)
+                    self._budget.decisions[self.current_case] = 1
+                    self._budget.withdraw(vl)
                     self.done = False
                     reward = self._reward(action)
 
@@ -160,8 +160,8 @@ class InsurEnv(Env):
                     self.episodes += 1
                     reward = 0
             else:
-                self.budget.decisions[self.current_case] = 0
-                if self.budget.pct_budget <= 1:
+                self._budget.decisions[self.current_case] = 0
+                if self._budget.pct_budget <= 1:
                     reward = self._reward(action)
                     self.done = False
                 else:
@@ -183,16 +183,16 @@ class InsurEnv(Env):
         self.states.append(self.state)
 
     def _sample(self, index=0):
-        idx = list(self.budget.decisions.keys())
+        idx = list(self._budget.decisions.keys())
         if index != 0 and len(idx) > 1:
-            idx = list(self.budget.decisions.keys())[0:-index]
-            return self.data.loc[idx, :]
-        return self.data.loc[idx, :]
+            idx = list(self._budget.decisions.keys())[0:-index]
+            return self._data.loc[idx, :]
+        return self._data.loc[idx, :]
 
     def benford_dist(self, previous=False):
-        vl = self._sample()[self.value_column].values
+        vl = self._sample()[self._value_column].values
         if previous:
-            vl = self._sample(index=1)[self.value_column].values
+            vl = self._sample(index=1)[self._value_column].values
         return Benford().distance(vl)
 
     def _reward(self, action):

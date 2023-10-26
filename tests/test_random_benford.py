@@ -3,8 +3,7 @@ from gym_insurance.envs.abenford import ABenford
 import scipy.stats as stats
 
 
-
-if __name__=='__main__':
+if __name__ == "__main__":
     # Create a power-law distribution object with a = 1, loc = 1
     benford = stats.powerlaw(a=1, loc=1)
     # Calculate the 95% upper confidence level using the inverse CDF (PPF)
