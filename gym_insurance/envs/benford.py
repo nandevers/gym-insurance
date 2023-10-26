@@ -1,31 +1,67 @@
+import os
 import random
 from math import log10
+from matplotlib import pyplot as plt
 
+import benfordslaw.benfordslaw as bf
 import numpy as np
 import pandas as pd
-import benfordslaw.benfordslaw as bf
 from benfordslaw.benfordslaw import _count_digit
+from scipy.spatial import distance
+
+decisions = {1: "approved", 0: "rejected", "decision": "all"}
 
 
 class Benford(object):
     def __init__(self, d=2) -> None:
-        self.bfs = [bf(pos=d + 1, verbose=0) for d in range(d)]
         self.d = d
+        self.drange = range(1, d + 1)
+        self.bfs = [bf(pos=d, verbose=0, alpha=0.01) for d in self.drange]
+
+    def update_drange(self, d):
+        self.drange = range(1, d + 1)
 
     def _fit(self, x):
-        return [self.bfs[d].fit(x) for d in range(self.d)]
+        return [self.bfs[d - 1].fit(x) for d in self.drange]
 
     def _vec_dist(self, x):
         emp_dist = self._fit(x)
-        return [emp_dist[d]["percentage_emp"][:, 1] for d in range(self.d)]
+        return [emp_dist[d - 1]["percentage_emp"][:, 1] for d in self.drange]
 
     def distance(self, x):
+        dists = 0
         emp_dist = self._vec_dist(x)
-        dists = [
-            np.linalg.norm(self.bfs[d].leading_digits - emp_dist[d])
-            for d in range(self.d)
-        ]
-        return np.mean(dists)
+        _dist = []
+        for d in self.drange:
+            len(self.bfs[d - 1].leading_digits) == emp_dist[d - 1]
+            _dist.append(
+                np.max(self.bfs[d - 1].leading_digits - emp_dist[d - 1])
+                / np.linalg.norm(self.bfs[d - 1].leading_digits - emp_dist[d - 1])
+            )
+        _dist_mean = np.mean(_dist)
+        if np.isnan(_dist_mean):
+            return 1
+        else:
+            return _dist_mean
+
+    def chi_test(self, x):
+        tests = self._fit(x)
+        return [tests[d - 1]["P_significant"] for d in self.drange]
+
+    def plot(self, x):
+        self._fit(x)
+        return [self.bfs[d - 1].plot(title=f"d={d}")[0] for d in self.drange]
+
+    def save_plot(self, x, path, decision=None):
+        self._fit(x)
+        for d in self.drange:
+            os.makedirs(path, exist_ok=True)
+            file_path = path / f"{decisions[decision]}_DIGIT_{d}.png"
+            _plot = self.bfs[d - 1].plot(
+                title=f"""Distribution of d={d} and n:{len(x)} for Decision: {decision}"""
+            )[0]
+            plt.close()
+            _plot.savefig(file_path)
 
 
 class BenfordRandom:

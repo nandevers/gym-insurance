@@ -1,0 +1,35 @@
+import os
+from typing import Dict
+import tensorflow as tf
+from keras.callbacks import TensorBoard
+
+
+class Wallet:
+    def __init__(self, budget: int) -> None:
+        self.budget: int = self._validate_budget(budget)
+        self.pct_budget: float = 0
+        self.current_budget: Dict[str, float] = {}
+        self.decisions: Dict[str, float] = {}
+        self.spent: float = 0
+
+    @staticmethod
+    def _validate_budget(budget: int) -> bool:
+        if not isinstance(budget, int):
+            raise ValueError(f"Budget should be a {int} not a {type(budget)}")
+        return budget
+
+    def withdraw(self, value: float) -> None:
+        if value <= 0:
+            raise ValueError("Withdrawals should be positive")
+        if value >= self.balance:
+            raise ValueError("Not allowed")
+
+        self.spent += value
+        if self.pct_budget <= 1 and self.spent <= self.budget:
+            self.pct_budget = self.spent / self.budget
+        else:
+            raise ValueError(f"Balance {self.balance} does not allow withdrawal")
+
+    @property
+    def balance(self) -> float:
+        return self.budget - self.spent

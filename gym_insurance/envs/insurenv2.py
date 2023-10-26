@@ -10,9 +10,9 @@ from keras.callbacks import TensorBoard
 
 MODEL_NAME = "insurance_dqn"
 
+
 # Own Tensorboard class
 class ModifiedTensorBoard(TensorBoard):
-
     # Overriding init to set initial step and writer (we want one log file for all .fit() calls)
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -55,11 +55,13 @@ class Wallet:
         self.budget = budget
         self.pct_budget = 0
         self.decisions = {}
+        self.current_budget = []
         self.spent = 0
 
     def withdraw(self, value):
         assert value > 0
         self.spent += value
+        self.current_budget.append(self.budget - self.spent)
         if self.pct_budget <= 1:
             self.pct_budget = self.spent / self.budget
         else:
@@ -142,7 +144,7 @@ class InsurEnv(Env):
 
     def step(self, action):
         self.steps += 1
-        vl = self.case["valor_indenização"].values[0]
+        vl = self.case["valor_indenizacao"].values[0]
         observation = self.state
         if vl is not None:
             if action == 1 and self.done is False:
