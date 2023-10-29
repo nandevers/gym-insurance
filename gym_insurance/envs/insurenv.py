@@ -4,7 +4,9 @@ import logging
 from typing import List, Tuple
 from gym import Env
 from gym_insurance.envs.benford import Benford
-from gym_insurance.envs.utils import Wallet  # Assuming Budget is defined elsewhere or imported from a module
+from gym_insurance.envs.utils import (
+    Wallet,
+)  # Assuming Budget is defined elsewhere or imported from a module
 
 
 def configure_logging():
@@ -13,6 +15,7 @@ def configure_logging():
         handlers=[logging.StreamHandler(), logging.FileHandler("app.log")],
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
+
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -23,13 +26,13 @@ np.random.seed(RANDOM_SEED)
 
 class InsurEnv(Env):
     def __init__(
-        self, 
-        data: pd.DataFrame, 
-        index_column: str, 
-        value_column: str, 
-        state_columns: List[str], 
-        budget: float, 
-        episodes: int = 10
+        self,
+        data: pd.DataFrame,
+        index_column: str,
+        value_column: str,
+        state_columns: List[str],
+        budget: float,
+        episodes: int = 10,
     ) -> None:
         """
         Initializes the Insurance Environment.
@@ -43,9 +46,9 @@ class InsurEnv(Env):
             episodes (int, optional): The number of episodes. Defaults to 10.
         """
         super(InsurEnv, self).__init__()
-        
+
         self._validate_inputs(data, index_column, value_column, state_columns)
-        
+
         data.set_index(index_column, inplace=True)
         self._data = data
         self._index_column = index_column
@@ -58,7 +61,6 @@ class InsurEnv(Env):
         self.rewards = []
         self.states = []
         self._reset()
-        
 
     def _validate_inputs(
         self,
@@ -86,8 +88,7 @@ class InsurEnv(Env):
             raise ValueError("Invalid state_columns provided.")
         if data.empty:
             raise ValueError("Data cannot be empty.")
-        
-    
+
     def _reset(self) -> None:
         """
         Resets the environment to the initial state for a new episode.
@@ -102,11 +103,11 @@ class InsurEnv(Env):
         self.woc = 0  # Assuming woc is an attribute that needs to be reset, replace with actual initialization as necessary
 
         # Reset or initialize other necessary attributes here
-        
+
         self._shuffle_data()  # Shuffle the data if necessary
         self._budget = Wallet(self.initial_budget, self.sampled_idx)
         self._budget.reset()  # Reset the budget
-        
+
         # Initialize or reset the observation space if necessary
         self.observation_space = np.zeros(len(self._state_columns), dtype=np.float32)
         self.initial_state = self._get_initial_state()
@@ -120,21 +121,23 @@ class InsurEnv(Env):
     def _shuffle_data(self) -> None:
         """
         Shuffles the data used in the environment.
-        
+
         This method shuffles the rows of the data DataFrame and updates the sampled index list.
         """
         # Ensure there is data to shuffle
         if self._data.empty:
             raise ValueError("Cannot shuffle empty data.")
 
-        self._data = (self._data.sample(frac=1, random_state=RANDOM_SEED).reset_index(drop=True))
+        self._data = self._data.sample(frac=1, random_state=RANDOM_SEED).reset_index(
+            drop=True
+        )
         self.sampled_idx = self._data.index.to_list()
 
     @property
     def current_case(self):
         self.case
         return self._budget.current_case
-    
+
     @property
     def current_value(self):
         return self.case[self._value_column]
@@ -142,13 +145,13 @@ class InsurEnv(Env):
     @property
     def case(self):
         self._budget.current_case = self.sampled_idx[self.steps]
-        case_data  = self._data.loc[self._budget.current_case]
+        case_data = self._data.loc[self._budget.current_case]
         if len(case_data.shape) > 1:
             logger.debug("More than one case presented at a time.")
             raise KeyError
         logger.info(f"Step: {self.steps} -- \n Case: {case_data}")
         return case_data
-    
+
     @property
     def state(self) -> np.array:
         """
@@ -179,9 +182,6 @@ class InsurEnv(Env):
         else:
             return zero_state
 
-
-
-
     def _update_steps(self):
         self.steps += 1
 
@@ -189,86 +189,76 @@ class InsurEnv(Env):
         if self.steps == 0:
             self.wc = 0.1
             self.woc = 1.10 * self.wc
-        elif self.approved == 0:
+        elif self.steps > 0 and self.approved == 0:
             self.wc = self.woc / 2
         else:
-            self.wc = self.benford_dist(action)
-            self.woc = self.benford_dist(action, previous=True)
+            self.wc = self.benford_dist(decision=1)
+            self.woc = self.benford_dist(action=0)
 
         if np.isnan(self.wc) or np.isnan(self.woc):
             logger.debug("Impossible to calculate reward")
         self.wcs.append(self.wc)
         self.wocs.append(self.woc)
 
-    def _sample(self, decision: int, previous: bool = False) -> pd.DataFrame:
-        """
-        Samples data based on the given decision and conditions.
-        
-        Args:
-            decision (int): The decision based on which to sample the data.
-            previous (bool, optional): If True, sample from previous cases. Defaults to False.
-        
-        Returns:
-            pd.DataFrame: The sampled data.
-        """
-        if decision == 0:
-            sample = self._data.loc[self.sampled_idx]
-        elif previous:
-            sample = self._data.loc[self.sampled_idx[self.steps - self.approved :]]
-        else:
-            sample = self._data
-        
-        return sample
-
     def reward(self, action):
         return self._reward(action)
-    
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:       
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
         return self._step(action)
 
     def _reward(self, action):
+        self.wc , self.woc = self.benford_dist()
         if self.steps == 0:
             return 0
         rev = 1
         if action == 1 and self.wc < self.woc:
-            return self.woc / self.wc * rev
+            reward =  self.woc / self.wc * rev
         elif action == 1 and self.wc >= self.woc:
-            return -self.wc / self.woc * rev
+            reward =  -self.wc / self.woc * rev
         elif action == 0 and self.wc < self.woc:
-            return -self.woc / self.wc * rev
+            reward =  -self.woc / self.wc * rev
         elif action == 0 and self.wc >= self.woc:
-            return self.wc / self.woc * rev
+            reward = self.wc / self.woc * rev
         
+        if reward >0:
+            return reward - 1
+        elif reward <0 :
+            return reward + 1
+        else:
+            return reward
+
 
     def _step(self, action):
         self._update_benford(action)
-        #FIXME: why use this werid looking local variable at all?
-        #TODO: Why is reward zero here
+        # FIXME: why use this werid looking local variable at all?
+        # TODO: Why is reward zero here
         reward = 0
 
         if self.steps >= len(self.sampled_idx):
             logger.info("More steps than data, impossible to continue.")
             return np.zeros(len(self._state_columns) + 4), reward, True, {}
-      
-        #TODO: how to deal with this inital state for observation?
+
+        # TODO: how to deal with this inital state for observation?
         observation = self.state
         if self.current_value is not None:
             if action == 1 and not self.done:
                 try:
                     self._budget.withdraw(self.current_value)
-                    self._budget.add_decision(case=self.current_case, decision = 1)
+                    self._budget.add_decision(case=self.current_case, decision=1)
                     reward = self._reward(action)
                 except ValueError:
-                    if self._budget.budget_spent_percentage <= self._data[self._value_column].min():
+                    if (
+                        self._budget.budget_spent_percentage
+                        <= self._data[self._value_column].min()
+                    ):
                         logger.error("Not enough budget")
                     if self.states:
                         observation = self.states[-1]
-                    self._budget.add_decision (case = self.current_case, decision=0)
+                    self._budget.add_decision(case=self.current_case, decision=0)
                     self.done = True
                     self.episodes += 1
             elif action == 0 and not self.done:
-                self._budget.add_decision(case =self.current_case , decision= 0)
+                self._budget.add_decision(case=self.current_case, decision=0)
                 if self._budget.budget_spent_percentage < 1:
                     reward = self._reward(action)
                 else:
@@ -281,28 +271,30 @@ class InsurEnv(Env):
             self._update_steps()
         return observation, reward, self.done, {}
 
-
-
-
     def _get_next_state(self, action):
         next_state = self.state.copy()
-        next_state[-1] = action  # Example: set the last element of the state to the current action
+        next_state[
+            -1
+        ] = action  # Example: set the last element of the state to the current action
         return next_state
-    
-    
-    def render(self, mode='human') -> None:
+
+    def render(self, mode="human") -> None:
         """
         Renders the current state of the environment.
 
         Args:
             mode (str, optional): The mode in which to render the environment. Defaults to 'human'.
         """
-        if mode != 'human':
-            raise ValueError("Invalid mode for rendering. Currently, only 'human' mode is supported.")
-        
-        print(f"Steps: {self.steps}, Approved: {self.approved}, Budget: {self._budget.available}, Max Value: {self.max_value}")
+        if mode != "human":
+            raise ValueError(
+                "Invalid mode for rendering. Currently, only 'human' mode is supported."
+            )
 
-    def benford_dist(self, decision: int, previous: bool = False) -> float:
+        print(
+            f"Steps: {self.steps}, Approved: {self.approved}, Budget: {self._budget.available}, Max Value: {self.max_value}"
+        )
+
+    def benford_dist(self) -> float:
         """
         Calculates the Benford distance for a given decision.
 
@@ -313,9 +305,14 @@ class InsurEnv(Env):
         Returns:
             float: The calculated Benford distance.
         """
-        sample = self._sample(decision=decision, previous=previous)
-        return Benford(3).distance(sample[self._value_column].values)
+        cases = self._budget.get_approved_cases()
+        sample = self._data.loc[cases, self._value_column].values
+        woc = Benford(3).distance(sample)
 
+        cases.append(self.current_case)
+        sample = self._data.loc[cases, self._value_column].values
+        wc = Benford(3).distance(sample)
+        return wc, woc
 
     @property
     def results(self) -> pd.DataFrame:
@@ -331,13 +328,13 @@ class InsurEnv(Env):
         results_data["rewards"] = self.rewards
         results_data["budget"] = list(self._budget.budgets.values())
         results_data["initial_budget"] = self.initial_budget
-        results_data["wc"] = self.wcs[:-1]
-        results_data["woc"] = self.wocs[:-1]
+        results_data["wc"] = self.wcs
+        results_data["woc"] = self.wocs
         results_data["steps"] = range(1, self.steps + 1)
         results_data["episodes"] = self.episodes
-        return results_data.join(self._data)
+        output_data = results_data.join(self._data)
+        return self.save_as_parquet(output_data)
 
-
-
-
-
+    def save_as_parquet(self, data):
+        data.to_parquet(".temp/results.parquet")
+        return data
