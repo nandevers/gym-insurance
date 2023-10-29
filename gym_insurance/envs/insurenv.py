@@ -51,7 +51,7 @@ class InsurEnv(Env):
         self._index_column = index_column
         self._value_column = value_column
         self._state_columns = state_columns
-        self._budget = Wallet(budget)
+        self.initial_budget = budget
         self.episodes = episodes
         self.wcs = []
         self.wocs = []
@@ -104,10 +104,8 @@ class InsurEnv(Env):
         # Reset or initialize other necessary attributes here
         
         self._shuffle_data()  # Shuffle the data if necessary
+        self._budget = Wallet(self.initial_budget, self.sampled_idx)
         self._budget.reset()  # Reset the budget
-        self._budget.decisions = self.sampled_idx
-        # Add any additional initialization or resetting of attributes as necessary
-        self.current_case = self.sampled_idx[self.steps]
         
         # Initialize or reset the observation space if necessary
         self.observation_space = np.zeros(len(self._state_columns), dtype=np.float32)
@@ -132,7 +130,14 @@ class InsurEnv(Env):
         self._data = (self._data.sample(frac=1, random_state=RANDOM_SEED).reset_index(drop=True))
         self.sampled_idx = self._data.index.to_list()
 
-
+    @property
+    def current_case(self):
+        self.case
+        return self._budget.current_case
+    
+    @property
+    def current_value(self):
+        return self.case[self._value_column]
 
     @property
     def case(self):
@@ -245,27 +250,25 @@ class InsurEnv(Env):
         if self.steps >= len(self.sampled_idx):
             logger.info("More steps than data, impossible to continue.")
             return np.zeros(len(self._state_columns) + 4), reward, True, {}
-
-        self._budget.current_budget[self.current_case] = self._budget.balance
-        benford_value = self.case[self._value_column]
+      
+        #TODO: how to deal with this inital state for observation?
         observation = self.state
-
-        if benford_value is not None:
+        if self.current_value is not None:
             if action == 1 and not self.done:
                 try:
-                    self._budget.withdraw(benford_value)
-                    self._budget.decisions[self.current_case] = 1
+                    self._budget.withdraw(self.current_value)
+                    self._budget.add_decision(case=self.current_case, decision = 1)
                     reward = self._reward(action)
                 except ValueError:
                     if self._budget.budget_spent_percentage <= self._data[self._value_column].min():
                         logger.error("Not enough budget")
                     if self.states:
                         observation = self.states[-1]
-                    self._budget.decisions[self.current_case] = 0
+                    self._budget.add_decision (case = self.current_case, decision=0)
                     self.done = True
                     self.episodes += 1
             elif action == 0 and not self.done:
-                self._budget.decisions[self.current_case] = 0
+                self._budget.add_decision(case =self.current_case , decision= 0)
                 if self._budget.budget_spent_percentage < 1:
                     reward = self._reward(action)
                 else:
@@ -274,7 +277,8 @@ class InsurEnv(Env):
 
         self.rewards.append(reward)
         self.states.append(self.state)
-        self._update_steps()
+        if not self.done:
+            self._update_steps()
         return observation, reward, self.done, {}
 
 
@@ -325,10 +329,10 @@ class InsurEnv(Env):
             self._budget.decisions, orient="index", columns=["decision"]
         )
         results_data["rewards"] = self.rewards
-        results_data["budget"] = list(self._budget.current_budget.values())
-        results_data["initial_budget"] = self._budget.budget
-        results_data["wc"] = self.wcs
-        results_data["woc"] = self.wocs
+        results_data["budget"] = list(self._budget.budgets.values())
+        results_data["initial_budget"] = self.initial_budget
+        results_data["wc"] = self.wcs[:-1]
+        results_data["woc"] = self.wocs[:-1]
         results_data["steps"] = range(1, self.steps + 1)
         results_data["episodes"] = self.episodes
         return results_data.join(self._data)
