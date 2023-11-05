@@ -207,26 +207,25 @@ class InsurEnv(Env):
         return self._step(action)
 
     def _reward(self, action):
-        self.wc , self.woc = self.benford_dist()
+        self.wc, self.woc = self.benford_dist()
         if self.steps == 0:
             return 0
         rev = 1
         if action == 1 and self.wc < self.woc:
-            reward =  self.woc / self.wc * rev
+            reward = self.woc / self.wc * rev
         elif action == 1 and self.wc >= self.woc:
-            reward =  -self.wc / self.woc * rev
+            reward = -self.wc / self.woc * rev
         elif action == 0 and self.wc < self.woc:
-            reward =  -self.woc / self.wc * rev
+            reward = -self.woc / self.wc * rev
         elif action == 0 and self.wc >= self.woc:
             reward = self.wc / self.woc * rev
-        
-        if reward >0:
+
+        if reward > 0:
             return reward - 1
-        elif reward <0 :
+        elif reward < 0:
             return reward + 1
         else:
             return reward
-
 
     def _step(self, action):
         self._update_benford(action)

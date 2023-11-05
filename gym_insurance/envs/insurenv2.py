@@ -125,10 +125,11 @@ class InsurEnv(Env):
         _values = list(*self.case[cols].values)
         if self._budget.spent == 0:
             return np.array(_values + [0.0, 0.0])
-        elif self._budget.pct_budget <= 1:
+        elif self._budget.budget_spent_percentage <= 1:
             self.approved = sum(self._budget.decisions.values())
             return np.array(
-                _values + [self._budget.pct_budget, self.approved / self.steps]
+                _values
+                + [self._budget.budget_spent_percentage, self.approved / self.steps]
             )
         else:
             return self._zero_array()
@@ -161,7 +162,7 @@ class InsurEnv(Env):
                     reward = 0
             else:
                 self._budget.decisions[self.current_case] = 0
-                if self._budget.pct_budget <= 1:
+                if self._budget.budget_spent_percentage <= 1:
                     reward = self._reward(action)
                     self.done = False
                 else:
