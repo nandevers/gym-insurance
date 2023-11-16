@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import logging
 from typing import List, Tuple
-from gym import Env
+from gym import Env, spaces
 from gym_insurance.envs.benford import Benford
 from gym_insurance.envs.utils import (
     Wallet,
@@ -32,7 +32,6 @@ class InsurEnv(Env):
         value_column: str,
         state_columns: List[str],
         budget: float,
-        episodes: int = 10,
     ) -> None:
         """
         Initializes the Insurance Environment.
@@ -46,6 +45,7 @@ class InsurEnv(Env):
             episodes (int, optional): The number of episodes. Defaults to 10.
         """
         super(InsurEnv, self).__init__()
+        self.action_space = spaces.Discrete(2)
 
         self._validate_inputs(data, index_column, value_column, state_columns)
 
@@ -55,7 +55,6 @@ class InsurEnv(Env):
         self._value_column = value_column
         self._state_columns = state_columns
         self.initial_budget = budget
-        self.episodes = episodes
         self.wcs = []
         self.wocs = []
         self.rewards = []
@@ -184,17 +183,6 @@ class InsurEnv(Env):
 
     def _update_steps(self):
         self.steps += 1
-
-    def _update_benford(self, action):
-        if self.steps == 0:
-            self.wc = 0.1
-            self.woc = 1.10 * self.wc
-        elif self.steps > 0 and self.approved == 0:
-            self.wc = self.woc / 2
-        else:
-            self.wc = self.benford_dist(decision=1)
-            self.woc = self.benford_dist(action=0)
-
         if np.isnan(self.wc) or np.isnan(self.woc):
             logger.debug("Impossible to calculate reward")
         self.wcs.append(self.wc)
@@ -228,7 +216,7 @@ class InsurEnv(Env):
             return reward
 
     def _step(self, action):
-        self._update_benford(action)
+        #self._update_benford(action)
         # FIXME: why use this werid looking local variable at all?
         # TODO: Why is reward zero here
         reward = 0
@@ -255,14 +243,12 @@ class InsurEnv(Env):
                         observation = self.states[-1]
                     self._budget.add_decision(case=self.current_case, decision=0)
                     self.done = True
-                    self.episodes += 1
             elif action == 0 and not self.done:
                 self._budget.add_decision(case=self.current_case, decision=0)
                 if self._budget.budget_spent_percentage < 1:
                     reward = self._reward(action)
                 else:
                     self.done = True
-                    self.episodes += 1
 
         self.rewards.append(reward)
         self.states.append(self.state)
@@ -324,13 +310,14 @@ class InsurEnv(Env):
         results_data = pd.DataFrame.from_dict(
             self._budget.decisions, orient="index", columns=["decision"]
         )
+        
         results_data["rewards"] = self.rewards
         results_data["budget"] = list(self._budget.budgets.values())
+        results_data["budget"].ffill(inplace=True)
         results_data["initial_budget"] = self.initial_budget
         results_data["wc"] = self.wcs
         results_data["woc"] = self.wocs
         results_data["steps"] = range(1, self.steps + 1)
-        results_data["episodes"] = self.episodes
         output_data = results_data.join(self._data)
         return self.save_as_parquet(output_data)
 
