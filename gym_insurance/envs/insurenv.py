@@ -1,17 +1,23 @@
 import numpy as np
+import warnings
+
+# Suppress specific runtime warnings
 import pandas as pd
 import logging
 from typing import List, Tuple
-from gym import Env, spaces
+from gymnasium import Env, spaces
 from gym_insurance.envs.benford import Benford
 from gym_insurance.envs.utils import (
     Wallet,
 )  # Assuming Budget is defined elsewhere or imported from a module
 
 
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+
 def configure_logging():
     logging.basicConfig(
-        level=logging.ERROR,
+        level=logging.INFO,
         handlers=[logging.StreamHandler(), logging.FileHandler("app.log")],
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
@@ -44,8 +50,8 @@ class InsurEnv(Env):
             budget (float): The initial budget for the environment.
             episodes (int, optional): The number of episodes. Defaults to 10.
         """
-        super(InsurEnv, self).__init__()
-        self.action_space = spaces.Discrete(2)
+        metadata = {"render_modes": ["human"], "render_fps": 30}
+        super().__init__()
 
         self._validate_inputs(data, index_column, value_column, state_columns)
 
@@ -55,10 +61,6 @@ class InsurEnv(Env):
         self._value_column = value_column
         self._state_columns = state_columns
         self.initial_budget = budget
-        self.wcs = []
-        self.wocs = []
-        self.rewards = []
-        self.states = []
         self._reset()
 
     def _validate_inputs(
@@ -88,6 +90,9 @@ class InsurEnv(Env):
         if data.empty:
             raise ValueError("Data cannot be empty.")
 
+    def reset(self, seed=None):
+        return self._reset(), {}
+
     def _reset(self) -> None:
         """
         Resets the environment to the initial state for a new episode.
@@ -95,11 +100,17 @@ class InsurEnv(Env):
         This method initializes various attributes of the environment, preparing it for a new episode.
         It also shuffles the data if necessary and resets the budget and other counters.
         """
+        self.wcs = []
+        self.wocs = []
+        self.rewards = []
+        self.states = []
+        self.action_space = spaces.Discrete(2)
         self.steps = 0
         self.approved = 0
         self.done = False
         self.wc = 0  # Assuming wc is an attribute that needs to be reset, replace with actual initialization as necessary
         self.woc = 0  # Assuming woc is an attribute that needs to be reset, replace with actual initialization as necessary
+        self.truncated = False
 
         # Reset or initialize other necessary attributes here
 
@@ -108,10 +119,14 @@ class InsurEnv(Env):
         self._budget.reset()  # Reset the budget
 
         # Initialize or reset the observation space if necessary
-        self.observation_space = np.zeros(len(self._state_columns), dtype=np.float32)
+        self.observation_space = spaces.Box(
+            low=-np.inf,
+            high=np.inf,
+            shape=(len(self._state_columns) + 4,),
+            dtype=np.float32,
+        )
         self.initial_state = self._get_initial_state()
-
-        return self.observation_space
+        return self.initial_state
 
     def _get_initial_state(self):
         initial_state = np.zeros(self.observation_space.shape)
@@ -148,7 +163,8 @@ class InsurEnv(Env):
         if len(case_data.shape) > 1:
             logger.debug("More than one case presented at a time.")
             raise KeyError
-        logger.info(f"Step: {self.steps} -- \n Case: {case_data}")
+        # logger.info(f"Step: {self.steps} -- \n Case: {case_data}")
+        logger.info(f"Step: {self.steps}")
         return case_data
 
     @property
@@ -171,13 +187,17 @@ class InsurEnv(Env):
             ]
             approved_ratio = len(approved_cases) / self.steps if self.steps else 0
             current_case_values = self.case[self._state_columns].values.flatten()
+            current_case_values = np.array(current_case_values, dtype=np.float32)
             additional_state_info = [
                 self._budget.budget_spent_percentage,
                 approved_ratio,
                 self.wc,
                 self.woc,
             ]
-            return np.concatenate([current_case_values, additional_state_info])
+            return np.concatenate(
+                [current_case_values, additional_state_info], dtype=np.float32
+            )
+
         else:
             return zero_state
 
@@ -191,22 +211,26 @@ class InsurEnv(Env):
     def reward(self, action):
         return self._reward(action)
 
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict]:
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict, bool]:
+        logger.info(f"starting step {self.steps}")
         return self._step(action)
 
     def _reward(self, action):
         self.wc, self.woc = self.benford_dist()
+        if self.wc == self.woc:
+            return 0
+
         if self.steps == 0:
             return 0
-        rev = 1
+
         if action == 1 and self.wc < self.woc:
-            reward = self.woc / self.wc * rev
-        elif action == 1 and self.wc >= self.woc:
-            reward = -self.wc / self.woc * rev
+            reward = self.woc / self.wc
+        elif action == 1 and self.wc > self.woc:
+            reward = -self.wc / self.woc
         elif action == 0 and self.wc < self.woc:
-            reward = -self.woc / self.wc * rev
-        elif action == 0 and self.wc >= self.woc:
-            reward = self.wc / self.woc * rev
+            reward = -self.woc / self.wc
+        elif action == 0 and self.wc > self.woc:
+            reward = self.wc / self.woc
 
         if reward > 0:
             return reward - 1
@@ -216,14 +240,14 @@ class InsurEnv(Env):
             return reward
 
     def _step(self, action):
-        #self._update_benford(action)
+        # self._update_benford(action)
         # FIXME: why use this werid looking local variable at all?
         # TODO: Why is reward zero here
         reward = 0
 
         if self.steps >= len(self.sampled_idx):
             logger.info("More steps than data, impossible to continue.")
-            return np.zeros(len(self._state_columns) + 4), reward, True, {}
+            return np.zeros(len(self._state_columns) + 4), reward, True, False, {}
 
         # TODO: how to deal with this inital state for observation?
         observation = self.state
@@ -239,6 +263,7 @@ class InsurEnv(Env):
                         <= self._data[self._value_column].min()
                     ):
                         logger.error("Not enough budget")
+                        self.truncated = True
                     if self.states:
                         observation = self.states[-1]
                     self._budget.add_decision(case=self.current_case, decision=0)
@@ -249,12 +274,13 @@ class InsurEnv(Env):
                     reward = self._reward(action)
                 else:
                     self.done = True
+                    self.truncated = True
 
         self.rewards.append(reward)
         self.states.append(self.state)
         if not self.done:
             self._update_steps()
-        return observation, reward, self.done, {}
+        return observation, reward, self.done, self.truncated, {}
 
     def _get_next_state(self, action):
         next_state = self.state.copy()
@@ -307,19 +333,34 @@ class InsurEnv(Env):
         Returns:
             pd.DataFrame: A DataFrame containing the results data.
         """
+        budgets = list(self._budget.budgets.values())
+
         results_data = pd.DataFrame.from_dict(
             self._budget.decisions, orient="index", columns=["decision"]
         )
-        
+        results_data = results_data.loc[results_data.decision.notnull(), :]
+        wcs = self.wcs
+        wocs = self.wocs
+        steps = range(1, self.steps + 1)
+        budgets_upper_limit = 0
+        if len(self.wcs) < len(self.rewards):
+            budgets_upper_limit = 1
+            wcs = [0] + self.wcs
+            wocs = [0] + self.wocs
+            steps = range(1, self.steps + 2)
+
         results_data["rewards"] = self.rewards
-        results_data["budget"] = list(self._budget.budgets.values())
+        results_data["cum_rewards"] = results_data["rewards"].cumsum()
+        results_data["budget"] = budgets[0 : self.steps + budgets_upper_limit]
         results_data["budget"].ffill(inplace=True)
+        results_data["budget"].fillna(self.initial_budget, inplace=True)
         results_data["initial_budget"] = self.initial_budget
-        results_data["wc"] = self.wcs
-        results_data["woc"] = self.wocs
-        results_data["steps"] = range(1, self.steps + 1)
+        results_data["wc"] = wcs
+        results_data["woc"] = wocs
+        results_data["steps"] = steps
         output_data = results_data.join(self._data)
-        return self.save_as_parquet(output_data)
+        # self.save_as_parquet(output_data)
+        return output_data
 
     def save_as_parquet(self, data):
         data.to_parquet(".temp/results.parquet")

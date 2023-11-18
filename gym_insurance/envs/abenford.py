@@ -53,7 +53,6 @@ class ABenford(object):
         max_length = max((int(l) for l in length)) + 1
 
         for i in range(min_length, max_length):
-            print(f"Calculating for {i}")
             self.observations = [
                 o[0] for o in observed_frequencies.items() if len(str(o[0])) == i
             ]

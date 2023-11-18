@@ -18,6 +18,7 @@ class Wallet:
         self._current_budget: Dict[int, float] = dict.fromkeys(self.sample_index)
         self._budgets: Dict[int, float] = dict.fromkeys(self.sample_index)
         self._decisions: Dict[int, Any] = dict.fromkeys(self.sample_index)
+        assert len(self._decisions.keys()) == len(self.sample_index)
 
     @staticmethod
     def _validate_budget(budget: int) -> None:
