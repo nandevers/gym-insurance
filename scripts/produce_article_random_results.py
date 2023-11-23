@@ -5,14 +5,14 @@ import plotly.express as px
 import seaborn as sns
 import matplotlib.pyplot as plt
 import gym_insurance
-
+from constants import BUDGET_LIST, DATAPATH
 
 def get_state_columns(data):
     return data.columns[5:-1]
 
 
 def load_data():
-    return pd.read_csv("../data/psr_train_and_test_set.paquet").query(
+    return pd.read_csv(DATAPATH / "psr_train_and_test_set.csv").query(
         "valor_indenizacao==valor_indenizacao"
     )
 
@@ -53,16 +53,12 @@ def run_experiment(budgets, num_episodes):
             results_df.append(env.results.copy(deep=True))
             results_df[-1]["episodes"] = episode
 
-        # Perform any necessary data analysis and manipulations
-        # This is a placeholder for analysis logic
-
         # Save results to CSV
         results_df = pd.concat(results_df, axis=0)
         csv_filename = f"{results_folder}/results_{budget}.paquet"
-        results_df.to_parquet(csv_filename, index=False)
+        #results_df.to_parquet(csv_filename, index=False)
     print(f"Experiment completed. Results are saved in {results_folder}")
 
 
 # Example budgets for running the experiment
-budgets = [1_000_000, 5_000_000, 10_000_000, 15_000_000]
-run_experiment(budgets, num_episodes=10)
+run_experiment(BUDGET_LIST, num_episodes=500)

@@ -126,9 +126,10 @@ venv.bak/
 dmypy.json
 
 # Pyre type checker
-.pyre/
-.png
-.ipynb_checkpoints
-.parquet
-.csv
-.zip
+*.pyre/
+*.png
+*.ipynb_checkpoints
+*.parquet
+*.csv
+*.zip
+experiment_results/*

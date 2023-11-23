@@ -61,6 +61,8 @@ class InsurEnv(Env):
         self._value_column = value_column
         self._state_columns = state_columns
         self.initial_budget = budget
+        self.episodes = 0
+        self.episode_data = {}
         self._reset()
 
     def _validate_inputs(
@@ -90,7 +92,16 @@ class InsurEnv(Env):
         if data.empty:
             raise ValueError("Data cannot be empty.")
 
-    def reset(self, seed=None):
+    def reset(self, seed=None, options=None):
+        if seed is not None:
+            super().reset(seed=seed)
+        self.episodes += 1
+        self.episode_data[str(self.episodes)] = self.results.copy(deep=True)
+        if self.steps>1:
+            df = pd.concat(self.episode_data, names=['episodes']).reset_index(level=0)
+            df.to_parquet(
+                f"experiment_results/results_{self.initial_budget}.parquet"
+            )
         return self._reset(), {}
 
     def _reset(self) -> None:
@@ -107,10 +118,10 @@ class InsurEnv(Env):
         self.action_space = spaces.Discrete(2)
         self.steps = 0
         self.approved = 0
-        self.done = False
         self.wc = 0  # Assuming wc is an attribute that needs to be reset, replace with actual initialization as necessary
         self.woc = 0  # Assuming woc is an attribute that needs to be reset, replace with actual initialization as necessary
         self.truncated = False
+        self.done = False
 
         # Reset or initialize other necessary attributes here
 
@@ -216,6 +227,7 @@ class InsurEnv(Env):
         return self._step(action)
 
     def _reward(self, action):
+        r = self.current_value
         self.wc, self.woc = self.benford_dist()
         if self.wc == self.woc:
             return 0
@@ -224,21 +236,21 @@ class InsurEnv(Env):
             return 0
 
         if action == 1 and self.wc < self.woc:
-            reward = self.woc / self.wc
+            reward = self.woc / self.wc * r
         elif action == 1 and self.wc > self.woc:
-            reward = -self.wc / self.woc
+            reward = -self.wc / self.woc * r
         elif action == 0 and self.wc < self.woc:
-            reward = -self.woc / self.wc
+            reward = -self.woc / self.wc * r
         elif action == 0 and self.wc > self.woc:
-            reward = self.wc / self.woc
+            reward = self.wc / self.woc * r
 
         if reward > 0:
-            return reward - 1
+            return reward -1
         elif reward < 0:
-            return reward + 1
+            return reward +1  
         else:
-            return reward
-
+            return reward 
+ 
     def _step(self, action):
         # self._update_benford(action)
         # FIXME: why use this werid looking local variable at all?
@@ -263,10 +275,10 @@ class InsurEnv(Env):
                         <= self._data[self._value_column].min()
                     ):
                         logger.error("Not enough budget")
-                        self.truncated = True
                     if self.states:
                         observation = self.states[-1]
                     self._budget.add_decision(case=self.current_case, decision=0)
+                    self.truncated = False
                     self.done = True
             elif action == 0 and not self.done:
                 self._budget.add_decision(case=self.current_case, decision=0)
@@ -274,7 +286,7 @@ class InsurEnv(Env):
                     reward = self._reward(action)
                 else:
                     self.done = True
-                    self.truncated = True
+                    self.truncated = False
 
         self.rewards.append(reward)
         self.states.append(self.state)
