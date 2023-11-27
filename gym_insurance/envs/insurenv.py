@@ -230,10 +230,10 @@ class InsurEnv(Env):
         r = self.current_value
         self.wc, self.woc = self.benford_dist()
         if self.wc == self.woc:
-            return 0
+            return 0.0
 
         if self.steps == 0:
-            return 0
+            return 0.0
 
         if action == 1 and self.wc < self.woc:
             reward = self.woc / self.wc * r
