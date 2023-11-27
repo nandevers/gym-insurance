@@ -1,0 +1,20 @@
+from pathlib import Path
+import logging
+
+MODELSPATH = Path("./models")
+DATAPATH = Path("C:\\Repos\\gym-insurance\\experiment_results\\data")
+TEMP_PATH = ".temp/"
+FILENAME = "insurance_claims.parquet"
+
+
+def configure_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        handlers=[logging.StreamHandler(), logging.FileHandler("app.log")],
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
+
+configure_logging()
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logger = logging.getLogger(__name__)
