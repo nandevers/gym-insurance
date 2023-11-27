@@ -40,7 +40,7 @@ class Benford(object):
             )
         _dist_mean = np.mean(_dist)
         if np.isnan(_dist_mean):
-            return 1
+            return 1.0
         else:
             return _dist_mean
 
