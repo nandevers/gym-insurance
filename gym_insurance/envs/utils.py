@@ -1,3 +1,7 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import os
 import logging
 from typing import Dict, Optional, Any
 
@@ -123,3 +127,47 @@ class Wallet:
         return [
             value for case, value in self._budgets.items() if self._decisions[case] == 0
         ]
+
+class DataDownloader:
+    def __init__(self, base_dir='./temp'):
+        self.base_dir = base_dir
+        os.makedirs(self.base_dir, exist_ok=True)
+
+    def get_xlsx_download_url(self, page_url):
+        response = requests.get(page_url)
+        if response.status_code != 200:
+            print("Failed to retrieve the webpage")
+            return None
+
+        soup = BeautifulSoup(response.content, 'html.parser')
+        download_link = soup.select_one('p > a')
+        
+        if download_link and 'href' in download_link.attrs:
+            return download_link['href']
+        else:
+            return None
+
+    def download_xlsx(self, xlsx_url, file_name):
+        response = requests.get(xlsx_url)
+        if response.status_code == 200:
+            with open(file_name, 'wb') as file:
+                file.write(response.content)
+            print(f"Downloaded {file_name}")
+            return file_name
+        else:
+            print(f"Failed to download {xlsx_url}")
+            return None
+
+    def convert_xlsx_to_csv(self, xlsx_path, csv_path):
+        df = pd.read_excel(xlsx_path)
+        df.to_csv(csv_path, index=False)
+        print(f"Saved as {csv_path}")
+
+    def process_dataset(self, dataset_url):
+        xlsx_url = self.get_xlsx_download_url(dataset_url)
+        if xlsx_url:
+            temp_xlsx_file = os.path.join(self.base_dir, xlsx_url.split('/')[-1])
+            downloaded_xlsx = self.download_xlsx(xlsx_url, temp_xlsx_file)
+            if downloaded_xlsx:
+                temp_csv_file = temp_xlsx_file.replace('.xlsx', '.csv')
+                self.convert_xlsx_to_csv(downloaded_xlsx, temp_csv_file)

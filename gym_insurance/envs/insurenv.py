@@ -100,7 +100,7 @@ class InsurEnv(Env):
         if self.steps>1:
             df = pd.concat(self.episode_data, names=['episodes']).reset_index(level=0)
             df.to_parquet(
-                f"experiment_results/results_{self.initial_budget}.parquet"
+                f"/results_{self.initial_budget}.parquet"
             )
         return self._reset(), {}
 
