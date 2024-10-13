@@ -35,7 +35,7 @@ GAMMA = 0.99  # Discount factor
 LEARNING_RATE = 0.001  # Lower learning rate for more stable convergence on CPU
 EPSILON = 1.0  # Exploration rate
 EPSILON_DECAY = 0.995  # Exploration decay rate
-MIN_EPSILON = 0.01  # Minimum exploration rate
+MIN_EPSILON = 0.001  # Minimum exploration rate
 LOG_DIR = ".temp/logs"  # TensorBoard log directory
 
 # Setup logging
@@ -170,10 +170,13 @@ def train_dqn(env: InsurEnv):
                 state = next_state
                 cumulative_reward += reward
 
+                global_step = (e * 10000) + env.steps
+
+
                 # Log metrics after every action
                 with tensorboard_writer.as_default():
-                    tf.summary.scalar('Total Reward', cumulative_reward, step=env.steps)
-                    tf.summary.scalar('Epsilon', agent.epsilon, step=env.steps)
+                    tf.summary.scalar('Epsilon', agent.epsilon, step=global_step)
+                    tf.summary.scalar('Total Reward', cumulative_reward, step=global_step)
 
                 # Replay and train the agent, log loss after each step
                 loss = agent.replay(BATCH_SIZE, e)
