@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import warnings
 
@@ -5,7 +6,7 @@ import warnings
 import pandas as pd
 import logging
 from typing import List, Tuple
-from gymnasium import Env, spaces
+from gym import Env, spaces
 from gym_insurance.envs.benford import Benford
 from gym_insurance.envs.utils import (
     Wallet,
@@ -46,11 +47,10 @@ class InsurEnv(Env):
             data (pd.DataFrame): The data to be used in the environment.
             index_column (str): The column name to be used as the index.
             value_column (str): The column name for values.
-            state_columns (List[str]): A list of column names to be used for states.
+            state_colmns (List[str]): A list of column names to be used for states.
             budget (float): The initial budget for the environment.
             episodes (int, optional): The number of episodes. Defaults to 10.
         """
-        metadata = {"render_modes": ["human"], "render_fps": 30}
         super().__init__()
 
         self._validate_inputs(data, index_column, value_column, state_columns)
@@ -93,16 +93,19 @@ class InsurEnv(Env):
             raise ValueError("Data cannot be empty.")
 
     def reset(self, seed=None, options=None):
+        if self.episodes > 0:
+            self.episode_data[str(self.episodes)] = self.results.copy(deep=True)
+            os.makedirs("../.temp/data/experiment_results/", exist_ok=True)
+            df = pd.concat(self.episode_data).reset_index(level=0)
+            df.rename(columns = {'level_0': 'episodes'}, inplace=True)
+            df = df.reset_index(drop=True)
+            df.to_parquet(
+                f".temp/data/experiment_results/results_{self.initial_budget}.parquet"
+            )
         if seed is not None:
             super().reset(seed=seed)
         self.episodes += 1
-        self.episode_data[str(self.episodes)] = self.results.copy(deep=True)
-        if self.steps>1:
-            df = pd.concat(self.episode_data, names=['episodes']).reset_index(level=0)
-            df.to_parquet(
-                f"experiment_results/results_{self.initial_budget}.parquet"
-            )
-        return self._reset(), {}
+        return self._reset().astype(np.float32), {}
 
     def _reset(self) -> None:
         """
@@ -131,8 +134,8 @@ class InsurEnv(Env):
 
         # Initialize or reset the observation space if necessary
         self.observation_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
+            low=np.full((88,), -1e3),
+            high=np.full((88,), 1e3),
             shape=(len(self._state_columns) + 4,),
             dtype=np.float32,
         )
@@ -245,12 +248,12 @@ class InsurEnv(Env):
             reward = self.wc / self.woc * r
 
         if reward > 0:
-            return reward -1
+            return reward - 1
         elif reward < 0:
-            return reward +1  
+            return reward + 1
         else:
-            return reward 
- 
+            return reward
+
     def _step(self, action):
         # self._update_benford(action)
         # FIXME: why use this werid looking local variable at all?
@@ -270,8 +273,9 @@ class InsurEnv(Env):
                     self._budget.add_decision(case=self.current_case, decision=1)
                     reward = self._reward(action)
                 except ValueError:
+                    self._budget.rollback_decision(self.current_case)
                     if (
-                        self._budget.budget_spent_percentage
+                        self._budget.budget_spent_percentage*self.initial_budget
                         <= self._data[self._value_column].min()
                     ):
                         logger.error("Not enough budget")
@@ -281,8 +285,9 @@ class InsurEnv(Env):
                     self.truncated = False
                     self.done = True
             elif action == 0 and not self.done:
+                self._budget.reject_withdrawal()
                 self._budget.add_decision(case=self.current_case, decision=0)
-                if self._budget.budget_spent_percentage < 1:
+                if self._budget.budget_spent_percentage <= 1:
                     reward = self._reward(action)
                 else:
                     self.done = True
@@ -292,13 +297,13 @@ class InsurEnv(Env):
         self.states.append(self.state)
         if not self.done:
             self._update_steps()
-        return observation, reward, self.done, self.truncated, {}
+        return observation.astype(np.float32), reward, self.done, {}
 
     def _get_next_state(self, action):
         next_state = self.state.copy()
-        next_state[
-            -1
-        ] = action  # Example: set the last element of the state to the current action
+        next_state[-1] = (
+            action  # Example: set the last element of the state to the current action
+        )
         return next_state
 
     def render(self, mode="human") -> None:
@@ -371,9 +376,11 @@ class InsurEnv(Env):
         results_data["woc"] = wocs
         results_data["steps"] = steps
         output_data = results_data.join(self._data)
-        # self.save_as_parquet(output_data)
+        #self.save_as_parquet(output_data)
         return output_data
 
     def save_as_parquet(self, data):
-        data.to_parquet(".temp/results.parquet")
+        data.to_parquet(
+            f".temp/data/experiment_results/results_{self.initial_budget}.parquet"
+        )
         return data

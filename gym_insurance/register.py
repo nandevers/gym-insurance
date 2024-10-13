@@ -1,4 +1,4 @@
-from gymnasium.envs.registration import register
+from gym.envs.registration import register
 
 register(
     id="InsurEnv-v0",  # Unique ID for your environment
