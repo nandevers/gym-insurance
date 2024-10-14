@@ -55,7 +55,6 @@ math.log10(1 + 1 / 1)
 math.log10(1 + 1 / 2)
 
 
-from gym_insurance.envs.benford import BenfordRandom
 from gym_insurance.envs.abenford import ABenford
 import scipy.stats as stats
 

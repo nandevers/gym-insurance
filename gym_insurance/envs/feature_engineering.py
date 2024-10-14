@@ -13,10 +13,11 @@ from sklearn.preprocessing import (
     normalize,
 )
 
-PRD_SAMP_FEAT_DATA = "data/processed/psr_sampled_features.csv"
-data = pd.read_csv(PRD_SAMP_FEAT_DATA)
+PRD_SAMP_FEAT_DATA = ".temp/data/processed/psr_sampled_features.parquet"
+data = pd.read_parquet(PRD_SAMP_FEAT_DATA)
 data["dt_proposta"] = pd.to_datetime(data["dt_proposta"])
-CUTOFF_YEAR = 2020
+data = data.query("valor_indenizacao>0")
+CUTOFF_YEAR = 2022
 print(data.shape)
 
 ID_COLS = [
@@ -172,14 +173,14 @@ data, std_cols = quantile_transformer(data)
 cols_to_write = (
     ID_COLS + std_cols + ep_cols + fd_cols + sd_cols + td_cols + ["valor_indenizacao"]
 )
-data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, cols_to_write].to_csv(
-    "data/processed/psr_train_set.csv", index=False
+data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, cols_to_write].to_parquet(
+    ".temp/data/processed/psr_train_set.parquet", index=False
 )
 
-data.loc[data.dt_proposta.dt.year > CUTOFF_YEAR, cols_to_write].to_csv(
-    f"data/processed/psr_test_set.csv", index=False
+data.loc[data.dt_proposta.dt.year > CUTOFF_YEAR, cols_to_write].to_parquet(
+    ".temp/data/processed/psr_test_set.parquet", index=False
 )
 
-data.loc[:, cols_to_write].to_csv(
-    f"data/processed/psr_train_and_test_set.csv", index=False
+data.loc[:, cols_to_write].to_parquet(
+    ".temp/data/processed/psr_train_and_test_set.parquet", index=False
 )

@@ -1,5 +1,4 @@
 import unittest
-import logging
 from gym_insurance.envs.utils import Wallet
 
 

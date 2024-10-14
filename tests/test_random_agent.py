@@ -1,6 +1,5 @@
 import pandas as pd
 
-import matplotlib.pyplot as plt
 import numpy as np
 from gym_insurance.envs.insurenv import InsurEnv
 
@@ -44,7 +43,7 @@ def run_random_agent(num_episodes, budget):
         acts = []
         while not done:
             action = agent.select_action(observation)
-            observation, reward, done, info = env.step(action)
+            observation, reward, done, truncated, info = env.step(action)
             # Optionally, render the environment
             # env.render()
         print(f"Episode {episode + 1} finished")
@@ -57,7 +56,7 @@ def run_random_agent(num_episodes, budget):
 
 def run_bootstrap_random_agent(budget, k=10):
     bootstrap_results = []
-    num_episodes = 100
+    num_episodes = 5
 
     for i in range(k):
         results = run_random_agent(num_episodes=num_episodes, budget=budget)

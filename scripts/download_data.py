@@ -61,7 +61,7 @@ def download_all_files_concurrently():
                 if result:
                     logging.info(f"Completed: {result}")
                 else:
-                    logging.warning(f"Download failed for one of the files.")
+                    logging.warning("Download failed for one of the files.")
             except Exception as e:
                 logging.error(f"Error in download task: {e}")
 

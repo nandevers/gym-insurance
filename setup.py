@@ -1,8 +1,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="gym_insurance",
+    name="gym-insurance",
     version="0.1",
+    package_dir={"gym-insurance": "gym_insurance"},
     packages=find_packages(),
     install_requires=[
         "benfordslaw",

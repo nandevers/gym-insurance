@@ -1,6 +1,5 @@
 import unittest
 import pandas as pd
-import numpy as np
 from gym_insurance.envs.insurenv import InsurEnv
 
 

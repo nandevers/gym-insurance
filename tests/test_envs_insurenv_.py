@@ -6,13 +6,8 @@ import logging
 import numpy as np
 import pandas as pd
 
-import plotly.figure_factory as ff
-import plotly.graph_objects as go
-import plotly.io as pio
 
 
-import matplotlib.pyplot as plt
-from scipy.stats import chisquare
 from gym_insurance.envs.insurenv import InsurEnv
 
 
@@ -21,14 +16,8 @@ import warnings
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", category=RuntimeWarning)
     # Code that produces the runtime warnings
-import numpy as np
 import scipy.stats as stats
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from scipy.stats import mannwhitneyu, wilcoxon, kruskal
 
 

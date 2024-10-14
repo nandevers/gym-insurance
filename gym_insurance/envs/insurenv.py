@@ -95,7 +95,7 @@ class InsurEnv(Env):
     def reset(self, seed=None, options=None):
         if self.episodes > 0:
             self.episode_data[str(self.episodes)] = self.results.copy(deep=True)
-            os.makedirs("../.temp/data/experiment_results/", exist_ok=True)
+            os.makedirs("./.temp/data/experiment_results/", exist_ok=True)
             df = pd.concat(self.episode_data).reset_index(level=0)
             df.rename(columns = {'level_0': 'episodes'}, inplace=True)
             df = df.reset_index(drop=True)
@@ -131,13 +131,11 @@ class InsurEnv(Env):
         self._shuffle_data()  # Shuffle the data if necessary
         self._budget = Wallet(self.initial_budget, self.sampled_idx)
         self._budget.reset()  # Reset the budget
-
-        # Initialize or reset the observation space if necessary
         self.observation_space = spaces.Box(
-            low=np.full((88,), -1e3),
-            high=np.full((88,), 1e3),
+            low=-np.inf,
+            high=np.inf,
             shape=(len(self._state_columns) + 4,),
-            dtype=np.float32,
+            dtype=np.float64,
         )
         self.initial_state = self._get_initial_state()
         return self.initial_state
@@ -230,29 +228,36 @@ class InsurEnv(Env):
         return self._step(action)
 
     def _reward(self, action):
-        r = self.current_value
+        r = 1
         self.wc, self.woc = self.benford_dist()
-        if self.wc == self.woc:
-            return 0
-
-        if self.steps == 0:
-            return 0
-
-        if action == 1 and self.wc < self.woc:
-            reward = self.woc / self.wc * r
-        elif action == 1 and self.wc > self.woc:
-            reward = -self.wc / self.woc * r
-        elif action == 0 and self.wc < self.woc:
-            reward = -self.woc / self.wc * r
-        elif action == 0 and self.wc > self.woc:
-            reward = self.wc / self.woc * r
-
-        if reward > 0:
-            return reward - 1
-        elif reward < 0:
-            return reward + 1
+        
+        if self.steps <=1:
+            if action == 0:
+                return -1
+            else:
+                return self.wc
         else:
-            return reward
+            if self.wc == self.woc:
+                return 0
+
+            if self.steps == 0:
+                return 0
+
+            if action == 1 and self.wc < self.woc:
+                reward = self.woc / self.wc * r
+            elif action == 1 and self.wc > self.woc:
+                reward = -self.wc / self.woc * r
+            elif action == 0 and self.wc < self.woc:
+                reward = -self.woc / self.wc * r
+            elif action == 0 and self.wc > self.woc:
+                reward = self.wc / self.woc * r
+
+            if reward > 0:
+                return reward - 1
+            elif reward < 0:
+                return reward + 1
+            else:
+                return reward
 
     def _step(self, action):
         # self._update_benford(action)
@@ -335,11 +340,14 @@ class InsurEnv(Env):
         """
         cases = self._budget.get_approved_cases()
         sample = self._data.loc[cases, self._value_column].values
-        woc = Benford(3).distance(sample)
-
+        woc, wc = (0, 0)
+        if len(sample)>0:
+            woc = Benford(3).distance(sample)
+        
         cases.append(self.current_case)
         sample = self._data.loc[cases, self._value_column].values
-        wc = Benford(3).distance(sample)
+        if len(sample)>0:
+            wc = Benford(3).distance(sample)
         return wc, woc
 
     @property

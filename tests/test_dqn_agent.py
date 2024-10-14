@@ -1,11 +1,8 @@
-import gymnasium as gym
+import gym as gym
 from stable_baselines3 import A2C
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
-import gymnasium as gym
-import gym_insurance  # This will register the environment
 
 
 # Create a sample dataset
