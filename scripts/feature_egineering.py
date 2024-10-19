@@ -1,3 +1,5 @@
+import logging
+import argparse
 import numpy as np
 import pandas as pd
 from category_encoders import BaseNEncoder, CountEncoder
@@ -5,14 +7,18 @@ from feature_engine.imputation import MeanMedianImputer
 from sklearn.preprocessing import (LabelEncoder, MinMaxScaler, OneHotEncoder,
                                    PowerTransformer, QuantileTransformer,
                                    RobustScaler, StandardScaler, normalize)
+import os
 
-PRD_SAMP_FEAT_DATA = ".temp/data/processed/psr_sampled_features.parquet"
-data = pd.read_parquet(PRD_SAMP_FEAT_DATA)
-data["dt_proposta"] = pd.to_datetime(data["dt_proposta"])
-data = data.query("valor_indenizacao>0")
+# Constants
 CUTOFF_YEAR = 2023
-print(data.shape)
+PRD_SAMP_FEAT_DATA = ".temp/data/processed/psr_sampled_features.parquet"
+OUTPUT_DIR = ".temp/data/processed/"
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+# Column definitions
 ID_COLS = [
     "nr_documento_segurado",
     "nr_proposta",
@@ -50,7 +56,9 @@ STD_COLS = [
 ]
 
 
+# Functions for preprocessing
 def handle_missing_values(data, method):
+    logger.info(f"Handling missing values using {method} method.")
     data["evento_preponderante"].fillna("outro", inplace=True)
     mmi = MeanMedianImputer(imputation_method=method)
     mmi.fit(data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, STD_COLS[1:]])
@@ -59,6 +67,7 @@ def handle_missing_values(data, method):
 
 
 def one_hot_encode(data, feature):
+    logger.info(f"One hot encoding feature: {feature}")
     enc = OneHotEncoder(handle_unknown="infrequent_if_exist")
     ep_train = data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, feature]
     ep = data[feature]
@@ -72,12 +81,14 @@ def one_hot_encode(data, feature):
 
 
 def label_encode(data, feature):
+    logger.info(f"Label encoding feature: {feature}")
     le = LabelEncoder()
     data[feature] = le.fit_transform(data[feature])
     return data, [feature]
 
 
 def standard_scaler(data):
+    logger.info("Standard scaling data.")
     std_new_cols = [f"std_{c}" for c in STD_COLS]
     scaler = StandardScaler()
     scaler.fit(data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, STD_COLS])
@@ -87,37 +98,8 @@ def standard_scaler(data):
     return data, std_new_cols
 
 
-def robust_scaler(data):
-    rs_new_cols = [f"rs_{c}" for c in STD_COLS]
-    scaler = RobustScaler()
-    scaler.fit(data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, STD_COLS])
-    rs_data = scaler.transform(data.loc[:, STD_COLS])
-    rs_data = pd.DataFrame(rs_data, columns=rs_new_cols)
-    data = pd.concat([data, rs_data], axis=1)
-    return data, rs_new_cols
-
-
-def minmax_scaler(data, feature_range=(0, 1)):
-    mm_new_cols = [f"mm_{c}" for c in STD_COLS]
-    scaler = MinMaxScaler(feature_range=feature_range)
-    scaler.fit(data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, STD_COLS])
-    mm_data = scaler.transform(data.loc[:, STD_COLS])
-    mm_data = pd.DataFrame(mm_data, columns=mm_new_cols)
-    data = pd.concat([data, mm_data], axis=1)
-    return data, mm_new_cols
-
-
-def normalize_data(data, norm="l2"):
-    norm_new_cols = [f"norm_{c}" for c in STD_COLS]
-    norm_data = normalize(data[STD_COLS], norm=norm)
-    norm_data = pd.DataFrame(norm_data, columns=norm_new_cols)
-    data = pd.concat([data, norm_data], axis=1)
-    return data, norm_new_cols
-
-
-def quantile_transformer(
-    data, n_quantiles=100, output_distribution="uniform", random_state=None
-):
+def quantile_transformer(data, n_quantiles=100, output_distribution="uniform", random_state=None):
+    logger.info(f"Applying quantile transformer with {n_quantiles} quantiles and {output_distribution} distribution.")
     qt_new_cols = [f"qt_{c}" for c in STD_COLS]
     transformer = QuantileTransformer(
         n_quantiles=n_quantiles,
@@ -131,51 +113,50 @@ def quantile_transformer(
     return data, qt_new_cols
 
 
-def power_transformer(data):
-    pt_new_cols = [f"pt_{c}" for c in PT_COLS]
-    scaler = PowerTransformer()
-    scaler.fit(data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, PT_COLS])
-    pt_data = scaler.transform(data.loc[:, PT_COLS])
-    pt_data = pd.DataFrame(pt_data, columns=pt_new_cols)
-    data = pd.concat([data, pt_data], axis=1)
-    return data, pt_new_cols
+def save_data(data, cols_to_write, output_dir, cutoff_year):
+    logger.info(f"Saving processed data to {output_dir}.")
+    train_path = os.path.join(output_dir, "psr_train_set.parquet")
+    test_path = os.path.join(output_dir, "psr_test_set.parquet")
+    full_data_path = os.path.join(output_dir, "psr_train_and_test_set.parquet")
+
+    data.loc[data.dt_proposta.dt.year <= cutoff_year, cols_to_write].to_parquet(train_path, index=False)
+    data.loc[data.dt_proposta.dt.year > cutoff_year, cols_to_write].to_parquet(test_path, index=False)
+    data.loc[:, cols_to_write].to_parquet(full_data_path, index=False)
+    logger.info("Data saved successfully.")
 
 
-def base_n_encode(data, feature, base=2):
-    encoder = BaseNEncoder(base=base)
-    encoded = encoder.fit_transform(data[feature])
-    columns = [f"{feature}_encoded_{i}" for i in range(encoded.shape[1])]
-    encoded.columns = columns
-    return pd.concat([data, encoded], axis=1), columns
+def main(input_path, output_dir, method):
+    logger.info(f"Loading data from {input_path}.")
+    data = pd.read_parquet(input_path)
+    data["dt_proposta"] = pd.to_datetime(data["dt_proposta"])
+    data = data.query("valor_indenizacao > 0")
+    logger.info(f"Data loaded with shape {data.shape}")
+
+    data = handle_missing_values(data, method)
+
+    # Encoding features
+    data, ep_cols = one_hot_encode(data, "evento_preponderante")
+    data, fd_cols = one_hot_encode(data, "first_digit")
+    data, sd_cols = one_hot_encode(data, "second_digit")
+    data, td_cols = one_hot_encode(data, "third_digit")
+
+    # Quantile transformation
+    data, std_cols = quantile_transformer(data)
+
+    # Add sample column for train/test split
+    data["sample"] = 'train'
+    data.loc[data.dt_proposta.dt.year > CUTOFF_YEAR, 'sample'] = 'test'
+
+    cols_to_write = ID_COLS + std_cols + ep_cols + fd_cols + sd_cols + td_cols + ["valor_indenizacao"]
+    save_data(data, cols_to_write, output_dir, CUTOFF_YEAR)
 
 
-def count_encode(data, feature):
-    ce = CountEncoder()
-    data = ce.fit_transform(data[feature])
-    data.rename(columns={feature: f"{feature}_count"}, inplace=True)
-    return pd.concat([data], axis=1), [f"{feature}_count"]
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Preprocess and save dataset with transformations.")
+    parser.add_argument("--input_path", type=str, default=PRD_SAMP_FEAT_DATA, help="Path to the input data file.")
+    parser.add_argument("--output_dir", type=str, default=OUTPUT_DIR, help="Directory where output data will be saved.")
+    parser.add_argument("--method", type=str, default="median", help="Method for missing value imputation.")
+    
+    args = parser.parse_args()
 
-
-data = handle_missing_values(data, "median")
-data, ep_cols = one_hot_encode(data, "evento_preponderante")
-data, fd_cols = one_hot_encode(data, "first_digit")
-data, sd_cols = one_hot_encode(data, "second_digit")
-data, td_cols = one_hot_encode(data, "third_digit")
-data, std_cols = quantile_transformer(data)
-data["sample"] = 'train'
-data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, 'sample'] = 'test'
-
-cols_to_write = (
-    ID_COLS + std_cols + ep_cols + fd_cols + sd_cols + td_cols + ["valor_indenizacao"]
-)
-data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, cols_to_write].to_parquet(
-    ".temp/data/processed/psr_train_set.parquet", index=False
-)
-
-data.loc[data.dt_proposta.dt.year > CUTOFF_YEAR, cols_to_write].to_parquet(
-    ".temp/data/processed/psr_test_set.parquet", index=False
-)
-
-data.loc[:, cols_to_write].to_parquet(
-    ".temp/data/processed/psr_train_and_test_set.parquet", index=False
-)
+    main(args.input_path, args.output_dir, args.method)
