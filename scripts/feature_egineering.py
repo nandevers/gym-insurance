@@ -2,22 +2,15 @@ import numpy as np
 import pandas as pd
 from category_encoders import BaseNEncoder, CountEncoder
 from feature_engine.imputation import MeanMedianImputer
-from sklearn.preprocessing import (
-    LabelEncoder,
-    MinMaxScaler,
-    OneHotEncoder,
-    PowerTransformer,
-    QuantileTransformer,
-    RobustScaler,
-    StandardScaler,
-    normalize,
-)
+from sklearn.preprocessing import (LabelEncoder, MinMaxScaler, OneHotEncoder,
+                                   PowerTransformer, QuantileTransformer,
+                                   RobustScaler, StandardScaler, normalize)
 
 PRD_SAMP_FEAT_DATA = ".temp/data/processed/psr_sampled_features.parquet"
 data = pd.read_parquet(PRD_SAMP_FEAT_DATA)
 data["dt_proposta"] = pd.to_datetime(data["dt_proposta"])
 data = data.query("valor_indenizacao>0")
-CUTOFF_YEAR = 2022
+CUTOFF_YEAR = 2023
 print(data.shape)
 
 ID_COLS = [
@@ -169,6 +162,8 @@ data, fd_cols = one_hot_encode(data, "first_digit")
 data, sd_cols = one_hot_encode(data, "second_digit")
 data, td_cols = one_hot_encode(data, "third_digit")
 data, std_cols = quantile_transformer(data)
+data["sample"] = 'train'
+data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, 'sample'] = 'test'
 
 cols_to_write = (
     ID_COLS + std_cols + ep_cols + fd_cols + sd_cols + td_cols + ["valor_indenizacao"]
@@ -178,9 +173,9 @@ data.loc[data.dt_proposta.dt.year <= CUTOFF_YEAR, cols_to_write].to_parquet(
 )
 
 data.loc[data.dt_proposta.dt.year > CUTOFF_YEAR, cols_to_write].to_parquet(
-    f".temp/data/processed/psr_test_set.parquet", index=False
+    ".temp/data/processed/psr_test_set.parquet", index=False
 )
 
 data.loc[:, cols_to_write].to_parquet(
-    f".temp/data/processed/psr_train_and_test_set.parquet", index=False
+    ".temp/data/processed/psr_train_and_test_set.parquet", index=False
 )
