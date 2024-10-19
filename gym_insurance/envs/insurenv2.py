@@ -93,12 +93,12 @@ class InsurEnv(Env):
     def reset(self, seed=None, options=None):
         if self.episodes > 0:
             self.episode_data[str(self.episodes)] = self.results.copy(deep=True)
-            os.makedirs(".temp/data/experiment_results/", exist_ok=True)
+            os.makedirs(f".temp/data/experiment_results/insurenv/{self.episodes}", exist_ok=True)
             df = pd.concat(self.episode_data).reset_index(level=0)
             df.rename(columns = {'level_0': 'episodes'}, inplace=True)
             df = df.reset_index(drop=True)
             df.to_parquet(
-                f".temp/data/experiment_results/insurenv_results_{self.initial_budget}.parquet"
+                f".temp/data/experiment_results/insurenv/{self.episodes}/results_{self.initial_budget}.parquet"
             )
         if seed is not None:
             super().reset(seed=seed)
@@ -135,12 +135,19 @@ class InsurEnv(Env):
         )
         self.initial_state = self._get_initial_state()
         return self.initial_state
-    
-    
+   
+   
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, dict, bool]:
-        logger.info(f"starting step {self.steps}")
+        logger.info(f"Starting step {self.steps}")
         reward = 0
 
+        # Check if case or current_value is NaN
+        if self.case is None or np.isnan(self.current_value):
+            logger.warning(f"Encountered NaN case or value at step {self.steps}, ending episode.")
+            self.done = True
+            return self.state, reward, self.done, {}, self.truncated
+        
+        # Check if maximum steps have been reached
         if self.steps >= len(self.sampled_idx) or self.steps >= self.max_steps:
             logger.info("Maximum steps reached or more steps than data, ending episode.")
             self.done = True
@@ -150,11 +157,10 @@ class InsurEnv(Env):
         if self.current_value is not None:
             if action == 1 and not self.done:  # Approve action
                 try:
-                    # Use the new decision method to handle approval and budget logic
+                    # Use the decision method to handle approval and budget logic
                     self._budget.decision(case=self.current_case, decision=1, value=self.current_value)
                     reward = self._reward(action)
                 except ValueError:
-                    self._budget.rollback_decision(self.current_case)
                     if self._budget.budget_spent_percentage * self.initial_budget <= self._data[self._value_column].min():
                         logger.error("Not enough budget")
                     if self.states:
@@ -179,7 +185,7 @@ class InsurEnv(Env):
             self.done = True
 
         return observation.astype(np.float32), reward, self.done, {}
-
+ 
 
     def _update_steps(self):
         """
@@ -230,36 +236,39 @@ class InsurEnv(Env):
         return self._reward(action)
 
     def _reward(self, action):
-        r = 1
         self.wc, self.woc = self.benford_dist()
+        
 
-        if self.steps <=1:
-            if action == 0:
-                return -1
+        # Handle early steps (steps <= 1)
+        if self.steps < 1:
+            return self.wc if action == 1 else 1 
+
+        # Handle cases where wc or woc is zero
+        if self.wc == 0 and self.woc == 0:
+            return 0  # Neutral outcome since both are zero
+        elif self.wc == 0:  # If wc is zero, handle based on woc
+            return 1 if action == 0 else -1
+        elif self.woc == 0:  # If woc is zero, handle based on wc
+            if action == 0: 
+                return 1 
+            elif self.wc != 0:
+                return self.wc 
             else:
-                return self.wc
-        else:
-            if self.wc == self.woc:
-                return 0
+                raise ValueError("Check approved cases")
 
-            if self.steps == 0:
-                return 0
+        # Handle case where wc equals woc
+        if self.wc == self.woc:
+            return 0  # Neutral reward if wc equals woc
 
-            if action == 1 and self.wc < self.woc:
-                reward = self.woc / self.wc * r
-            elif action == 1 and self.wc > self.woc:
-                reward = -self.wc / self.woc * r
-            elif action == 0 and self.wc < self.woc:
-                reward = -self.woc / self.wc * r
-            elif action == 0 and self.wc > self.woc:
-                reward = self.wc / self.woc * r
+        # Calculate reward based on the action and wc/woc comparison
+        if action == 1:  # Approve action
+            reward = self.woc / self.wc if self.wc < self.woc else -self.wc / self.woc
+        else:  # Reject action (action == 0)
+            reward = -self.woc / self.wc if self.wc < self.woc else self.wc / self.woc
 
-            if reward > 0:
-                return reward - 1
-            elif reward < 0:
-                return reward + 1
-            else:
-                return reward
+        # Return the computed reward directly
+        return reward
+
 
     def benford_dist(self) -> float:
         """
@@ -268,13 +277,13 @@ class InsurEnv(Env):
         Returns:
             float: The calculated Benford distance.
         """
-        cases = self._budget.get_approved_cases()
+        cases = self._budget.get_approved_cases()[:-1]
         sample = self._data.loc[cases, self._value_column].values
         woc, wc = (0, 0)
-        if len(sample)>0:
+        if len(sample)>1:
             woc = Benford(3).distance(sample)
-        
-        cases.append(self.current_case)
+            
+        cases = self._budget.get_approved_cases()
         sample = self._data.loc[cases, self._value_column].values
         if len(sample)>0:
             wc = Benford(3).distance(sample)
@@ -288,15 +297,35 @@ class InsurEnv(Env):
     def current_value(self):
         return self.case[self._value_column]
 
+#    @property
+#    def case(self):
+#        self._budget.current_case = self.sampled_idx[self.steps]
+#        case_data = self._data.loc[self._budget.current_case]
+#        if len(case_data.shape) > 1:
+#            logger.debug("More than one case presented at a time.")
+#            raise KeyError
+#        logger.info(f"Step: {self.steps}")
+#        return case_data
+
     @property
     def case(self):
+        if self.steps >= len(self.sampled_idx):
+            logger.error("Step index exceeds the available data cases.")
+            raise IndexError("Invalid step index: No more cases to process.")
+        
         self._budget.current_case = self.sampled_idx[self.steps]
-        case_data = self._data.loc[self._budget.current_case]
-        if len(case_data.shape) > 1:
-            logger.debug("More than one case presented at a time.")
-            raise KeyError
-        logger.info(f"Step: {self.steps}")
-        return case_data
+        
+        try:
+            case_data = self._data.loc[self._budget.current_case]
+            if len(case_data.shape) > 1:
+                logger.debug("More than one case presented at a time.")
+                raise KeyError("Multiple cases found for a single index.")
+            logger.info(f"Step: {self.steps}, Case: {self._budget.current_case}")
+            return case_data
+        except KeyError as e:
+            logger.error(f"Invalid case data for step {self.steps}: {e}")
+            return None
+
 
     @property
     def state(self) -> np.array:
@@ -308,7 +337,7 @@ class InsurEnv(Env):
         """
         zero_state = np.zeros(len(self._state_columns) + 4)
 
-        if self._budget.balance == self.initial_budget:
+        if self.steps == 0:
             return zero_state
         elif self._budget.budget_spent_percentage <= 1:
             approved_cases = self._budget.get_approved_cases()
@@ -345,8 +374,8 @@ class InsurEnv(Env):
         output_data = results_data.join(self._data)
         return output_data
 
-    def save_as_parquet(self, data):
+    def save_as_parquet(self, data, episode):
         data.to_parquet(
-            f".temp/data/experiment_results/insurenv_results_{self.initial_budget}.parquet"
+            f".temp/data/experiment_results/insurenv/{episode}/{self.initial_budget}.parquet"
         )
         return data
