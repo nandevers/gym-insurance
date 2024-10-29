@@ -1,12 +1,13 @@
-import pandas as pd
-import os
 import logging
+import os
+
+import pandas as pd
 
 os.makedirs(".temp/logs/", exist_ok=True)
 
 # Set up logging
 logging.basicConfig(
-    filename=".temp/logs/psr_sampled_features.log",
+    filename=".temp/logs/psr_soja_pr_sample.log",
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )

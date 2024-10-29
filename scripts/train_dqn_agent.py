@@ -1,20 +1,21 @@
+import logging
 import os
 import random
-import numpy as np
-import tensorflow as tf
 from collections import deque
+from datetime import datetime
+from pathlib import Path
+
+import gym
+import numpy as np
+import pandas as pd
+import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
-from gym_insurance.constants import DATAPATH, MODELSPATH, BUDGET_LIST
-import pandas as pd
-from typing import List
-from gym import Env
-from gym_insurance.envs.insurenv import InsurEnv  # Assuming InsurEnv is defined in insur_env.py
-import gym
-import logging
-from datetime import datetime
-from pathlib import Path
+
+from gym_insurance.constants import DATAPATH
+from gym_insurance.envs.insurenv import \
+    InsurEnv  # Assuming InsurEnv is defined in insur_env.py
 
 # Set random seeds for reproducibility
 RANDOM_SEED = 42
@@ -24,8 +25,12 @@ tf.random.set_seed(RANDOM_SEED)
 
 # TensorFlow optimization settings for better CPU usage
 tf.config.threading.set_intra_op_parallelism_threads(8)  # Tune the number of threads
-tf.config.threading.set_inter_op_parallelism_threads(4)  # Increase threads for parallel ops
-tf.config.set_soft_device_placement(True)  # Ensure TensorFlow dynamically places ops on CPU/GPU
+tf.config.threading.set_inter_op_parallelism_threads(
+    4
+)  # Increase threads for parallel ops
+tf.config.set_soft_device_placement(
+    True
+)  # Ensure TensorFlow dynamically places ops on CPU/GPU
 
 # Hyperparameters
 EPISODES = 50
@@ -40,9 +45,9 @@ LOG_DIR = ".temp/logs"  # TensorBoard log directory
 
 # Setup logging
 logging.basicConfig(
-    filename='dqn_training.log',
+    filename="dqn_training.log",
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 # TensorBoard writer
@@ -51,6 +56,7 @@ tensorboard_writer = tf.summary.create_file_writer(f"{LOG_DIR}/{current_time}")
 
 index_column = "id_proposta"
 value_column = "valor_indenizacao"
+
 
 # Helper function to load data
 def load_data():
@@ -65,6 +71,7 @@ def load_data():
     except Exception as e:
         logging.error(f"Error loading data: {e}")
         raise
+
 
 # Define DQN Agent
 class DQNAgent:
@@ -84,11 +91,13 @@ class DQNAgent:
         self.losses = []  # Track training losses
 
     def build_model(self):
-        model = Sequential([
-            layers.Dense(128, input_dim=self.state_size, activation="relu"),
-            layers.Dense(128, activation="relu"),
-            layers.Dense(self.action_size, activation="linear"),
-        ])
+        model = Sequential(
+            [
+                layers.Dense(128, input_dim=self.state_size, activation="relu"),
+                layers.Dense(128, activation="relu"),
+                layers.Dense(self.action_size, activation="linear"),
+            ]
+        )
         # Use Adam optimizer without mixed precision for CPU training
         opt = Adam(learning_rate=self.learning_rate)
         model.compile(loss="mse", optimizer=opt)
@@ -120,12 +129,16 @@ class DQNAgent:
             if done:
                 target[0][action] = reward
             else:
-                t = self.target_model.predict(np.expand_dims(next_state, axis=0), verbose=0)
+                t = self.target_model.predict(
+                    np.expand_dims(next_state, axis=0), verbose=0
+                )
                 target[0][action] = reward + self.gamma * np.amax(t[0])
 
             # Perform one step of training
-            history = self.model.fit(np.expand_dims(state, axis=0), target, epochs=1, verbose=0)
-            loss = history.history['loss'][0]
+            history = self.model.fit(
+                np.expand_dims(state, axis=0), target, epochs=1, verbose=0
+            )
+            loss = history.history["loss"][0]
             losses.append(loss)
 
         mean_loss = np.mean(losses)
@@ -142,13 +155,14 @@ class DQNAgent:
         """Log the loss to TensorBoard with a unique step."""
         global_step = episode * 1000 + step  # Use global step for uniqueness
         with tensorboard_writer.as_default():
-            tf.summary.scalar('Loss', loss, step=global_step)
+            tf.summary.scalar("Loss", loss, step=global_step)
 
     def load(self, name):
         self.model.load_weights(name)
 
     def save(self, filepath):
         self.model.save_weights(filepath)
+
 
 def train_dqn(env: InsurEnv):
     agent = DQNAgent(env)
@@ -159,7 +173,9 @@ def train_dqn(env: InsurEnv):
         for e in range(EPISODES):
             state, _ = env.reset()
             # Track cumulative reward per episode
-            cumulative_reward = 0  # Add this inside the main training loop, after state reset
+            cumulative_reward = (
+                0  # Add this inside the main training loop, after state reset
+            )
             done = False
             total_reward = 0
             step = 0
@@ -171,8 +187,8 @@ def train_dqn(env: InsurEnv):
                 state = next_state
                 total_reward += reward
                 with tensorboard_writer.as_default():
-                    tf.summary.scalar('Total Reward', total_reward, step=e)
-                    tf.summary.scalar('Epsilon', agent.epsilon, step=e)
+                    tf.summary.scalar("Total Reward", total_reward, step=e)
+                    tf.summary.scalar("Epsilon", agent.epsilon, step=e)
 
                 # Replay and train the agent, log loss at each step
                 loss = agent.replay(BATCH_SIZE, e, step)
@@ -181,12 +197,12 @@ def train_dqn(env: InsurEnv):
 
                 step += 1
 
-            logging.info(f"Episode: {e + 1}/{EPISODES}, Reward: {total_reward}, Epsilon: {agent.epsilon}")
+            logging.info(
+                f"Episode: {e + 1}/{EPISODES}, Reward: {total_reward}, Epsilon: {agent.epsilon}"
+            )
             episode_rewards.append(total_reward)
 
             # Log episode-level metrics to TensorBoard
-                
-
 
             # Update the target model after each episode
             agent.update_target_model()
@@ -201,8 +217,10 @@ def train_dqn(env: InsurEnv):
 
     return episode_rewards, full_loss_data
 
+
 def get_state_columns(data):
     return data.columns[5:-1]
+
 
 # Example usage with gym.make()
 def run_dqn_with_insurenv():
@@ -227,9 +245,10 @@ def run_dqn_with_insurenv():
         logging.error(f"Error in setting up the environment or training: {e}")
         raise
 
+
 if __name__ == "__main__":
     os.makedirs(".temp/data/experiment_results", exist_ok=True)
     episode_rewards, loss = run_dqn_with_insurenv()
     loss_df = pd.DataFrame(loss)  # Convert loss data to a DataFrame
-    loss_df.to_parquet(f".temp/data/experiment_results/loss_dqn.parquet", index=False)
+    loss_df.to_parquet(".temp/data/experiment_results/loss_dqn.parquet", index=False)
     logging.info("Training completed and results saved.")

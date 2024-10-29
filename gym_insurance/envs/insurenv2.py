@@ -297,16 +297,6 @@ class InsurEnv(Env):
     def current_value(self):
         return self.case[self._value_column]
 
-#    @property
-#    def case(self):
-#        self._budget.current_case = self.sampled_idx[self.steps]
-#        case_data = self._data.loc[self._budget.current_case]
-#        if len(case_data.shape) > 1:
-#            logger.debug("More than one case presented at a time.")
-#            raise KeyError
-#        logger.info(f"Step: {self.steps}")
-#        return case_data
-
     @property
     def case(self):
         if self.steps >= len(self.sampled_idx):

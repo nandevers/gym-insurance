@@ -1,6 +1,6 @@
 import logging
-from collections import namedtuple, OrderedDict, deque
 import os
+from collections import OrderedDict, deque, namedtuple
 
 # Create log directory if it doesn't exist
 log_dir = ".temp/logs"

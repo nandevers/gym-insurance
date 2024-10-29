@@ -1,7 +1,8 @@
 import concurrent.futures
-import requests
 import logging
 import os
+
+import requests
 
 # Configure logging
 logging.basicConfig(

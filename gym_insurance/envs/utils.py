@@ -1,3 +1,7 @@
+
+import os
+import shutil
+import pandas as pd
 import logging
 from typing import Dict, Optional, Any
 
@@ -83,8 +87,6 @@ class Wallet:
         return self._decisions.get(self._current_case)
 
     def add_decision(self, case: int, decision: Any) -> None:
-        if case < 0:
-            raise ValueError("Case number cannot be negative")
         self._decisions[case] = decision
 
     def get_approved_cases(self) -> list:
@@ -148,3 +150,58 @@ class Wallet:
 
         if self._current_case == case:
             self._current_case = None  # Reset the current case if it's the same case
+
+
+
+
+
+def move_parquet_files(source_dir, destination_dir, budget):
+    """
+    Read all Parquet files inside each immediate subdirectory of source_dir,
+    concatenate them into a single DataFrame, add a column 'episodes' based on
+    the subdirectory name, and write them as a single file in destination_dir.
+    The output file is named results_{budget}.parquet.
+    
+    :param source_dir: The directory to read files from.
+    :param destination_dir: The directory to write the concatenated file to.
+    :param budget: The budget value to include in the output filename.
+    """
+    # Ensure destination directory exists
+    if not os.path.exists(destination_dir):
+        os.makedirs(destination_dir)
+    
+    # List immediate subdirectories in source_dir
+    subdirs = [name for name in os.listdir(source_dir)
+               if os.path.isdir(os.path.join(source_dir, name))]
+    
+    all_dfs = []
+    
+    for subdir in subdirs:
+        subdir_path = os.path.join(source_dir, subdir)
+        # Get all Parquet files in the subdirectory
+        parquet_files = [os.path.join(subdir_path, f)
+                         for f in os.listdir(subdir_path)
+                         if f.endswith('.parquet')]
+        
+        if parquet_files:
+            # Read and concatenate Parquet files
+            dfs = [pd.read_parquet(pf) for pf in parquet_files]
+            concatenated_df = pd.concat(dfs, ignore_index=True)
+            # Add 'episodes' column based on subdir name
+            concatenated_df['episodes'] = int(subdir)
+            # Append to list of all DataFrames
+            all_dfs.append(concatenated_df)
+            print(f"Processed Parquet files for episode {subdir}")
+        else:
+            print(f"No Parquet files found in {subdir_path}")
+    
+    if all_dfs:
+        # Concatenate all DataFrames from all subdirectories
+        final_df = pd.concat(all_dfs, ignore_index=True)
+        # Write final DataFrame to destination directory
+        output_filename = f"results_{budget}.parquet"
+        destination_file = os.path.join(destination_dir, output_filename)
+        final_df.to_parquet(destination_file)
+        print(f"Wrote concatenated Parquet file to {destination_file}")
+    else:
+        print("No Parquet files found in any subdirectories.")

@@ -1,4 +1,7 @@
 # Byte-compiled / optimized / DLL files
+*.pem
+*.pkl
+*.ppk
 __pycache__/
 *.py[cod]
 *$py.class
@@ -134,3 +137,4 @@ dmypy.json
 *.zip
 experiment_results/*
 events*
+.temp/*

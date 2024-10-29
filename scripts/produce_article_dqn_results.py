@@ -1,3 +1,5 @@
+# Imports at the beginning of the file
+import gym_insurance.envs.utils as ut
 import logging
 import os
 import random
@@ -22,7 +24,7 @@ from gym_insurance.constants import BUDGET_LIST, DATAPATH
 from gym_insurance.envs.insurenv2 import InsurEnv  # Assuming InsurEnv is defined in insur_env.py
 
 SOURCE_DIR = ".temp/data/experiment_results/insurenv"
-DESTINATION_DIR = ".temp/data/experiment_results/dqn/results"
+DESTINATION_DIR = ".temp/data/experiment_results/dqn/insurenv/"
 
 # Set random seeds for reproducibility
 RANDOM_SEED = 42
@@ -37,17 +39,17 @@ tf.config.set_soft_device_placement(True)
 
 
 # Hyperparameters
-EPISODES = 500  # Increased to allow for more training
+EPISODES = 2_000  # Increased to allow for more training
 MIN_MEMORY = 64  # Minimum memory for replay
 BATCH_SIZE = 32  # Lowered to match original DQN paper
-MAX_MEMORY_SIZE = 40_000  # Increased replay memory size
+MAX_MEMORY_SIZE = 20_000  # Increased replay memory size
 GAMMA = 0.99  # Discount factor as in the original DQN
 LEARNING_RATE = 0.001  # Learning rate from the original DQN
 EPSILON = 1.0  # **Initial exploration rate**
 EPSILON_DECAY = 0.7  # Gradual decay over time
 MIN_EPSILON = 0.1  # As used in the original paper
-TARGET_UPDATE_FREQ = 10000  # Fixed target network update frequency
-MAX_STEPS = 300  # Max steps per episode
+TARGET_UPDATE_FREQ = 100  # Fixed target network update frequency
+MAX_STEPS = 3000  # Max steps per episode
 MIN_VALOR_INDENIZACAO = 100
 index_column = "id_proposta"
 value_column = "valor_indenizacao"
@@ -104,6 +106,15 @@ def get_state_columns(data: pd.DataFrame) -> List[str]:
     logger.debug("State columns extracted: %s", state_columns)
     return state_columns
 
+
+
+# Check if the directory exists
+if os.path.exists(SOURCE_DIR):
+    # Remove the entire directory and its contents
+    shutil.rmtree(SOURCE_DIR)
+    print(f"Directory '{SOURCE_DIR}' and its contents have been removed.")
+else:
+    print(f"Directory '{SOURCE_DIR}' does not exist.")
 
 class DQNAgent:
     def __init__(
@@ -385,8 +396,8 @@ def train_dqn(
     tensorboard_writer: tf.summary.SummaryWriter,
     tensorboard_log_dir: str,
     budget: int,
-    early_stopping_patience: int = 6,  # Number of episodes without improvement to stop
-    early_stopping_min_delta: float = 0.1,  # Minimum improvement to reset patience
+    early_stopping_patience: int = 300,  # Number of episodes without improvement to stop
+    early_stopping_min_delta: float = 0.001,  # Minimum improvement to reset patience
 ) -> Tuple[List[float], List[Dict[str, Any]]]:
     """Train the DQN agent in the given environment with early stopping."""
     agent = DQNAgent(env, tensorboard_writer, tensorboard_log_dir, budget)
@@ -511,38 +522,8 @@ def run_dqn_with_insurenv(budget: int) -> Tuple[List[float], List[Dict[str, Any]
 
     return train_dqn(env, tensorboard_writer, tensorboard_log_dir, budget)
 
-
-
-def move_parquet_files(source_dir, destination_dir):
-    """
-    Move all parquet files from source_dir (including subdirectories) to destination_dir.
-    
-    :param source_dir: The directory to move files from.
-    :param destination_dir: The directory to move files to.
-    """
-    # Ensure destination directory exists
-    if not os.path.exists(destination_dir):
-        os.makedirs(destination_dir)
-        
-    # Walk through all files in source directory and subdirectories
-    for root, dirs, files in os.walk(source_dir):
-        for file in files:
-            if file.endswith(".parquet"):
-                # Full path of the source file
-                source_file_path = os.path.join(root, file)
-                
-                # Move file to destination directory
-                destination_file_path = os.path.join(destination_dir, file)
-                
-                print(f"Moving file: {source_file_path} to {destination_file_path}")
-                
-                shutil.move(source_file_path, destination_file_path)
-
-
-
-
 if __name__ == "__main__":
-    os.makedirs(".temp/data/experiment_results/dqn", exist_ok=True)
+    os.makedirs(".temp/data/experiment_results/dqn/results", exist_ok=True)
     logger.info("Starting DQN training for multiple budgets.")
 
     for budget in BUDGET_LIST:
@@ -555,4 +536,4 @@ if __name__ == "__main__":
             index=False,
         )
         logger.info(f"Training completed and results saved for budget: {budget}")
-        move_parquet_files(SOURCE_DIR, DESTINATION_DIR)
+        ut.move_parquet_files(SOURCE_DIR, DESTINATION_DIR, budget=budget)

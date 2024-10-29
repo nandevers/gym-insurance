@@ -1,6 +1,7 @@
 import json
-import pandas as pd
 import logging
+
+import pandas as pd
 from f_utils import CumulativeCountEncoder, CumulativeEncoder
 
 # File paths
@@ -10,10 +11,11 @@ PRD_SAMP_FEAT_DATA = ".temp/data/processed/psr_sampled_features.parquet"
 
 # Setup logging
 logging.basicConfig(
-    filename="data_processing.log", 
+    filename="data_processing.log",
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
 
 def log_missing_data(df, name):
     """Logs the amount and percentage of missing data for each column in the DataFrame."""
@@ -24,6 +26,7 @@ def log_missing_data(df, name):
         if missing > 0:
             logging.info(f"{col}: {missing} missing values ({pct:.2f}%)")
 
+
 if __name__ == "__main__":
     # Load column dictionary
     logging.info("Loading column dictionary.")
@@ -33,18 +36,17 @@ if __name__ == "__main__":
     # Load sample data
     logging.info(f"Loading data from {PRD_SAMPLE_DATA}.")
     data = pd.read_parquet(PRD_SAMPLE_DATA).query("valor_indenizacao>0")
-    
+
     # Log missing data for initial load
     log_missing_data(data, "Initial Data")
-    
+
     tdata = []
 
     # Cumulative count encoding
     logging.info("Applying CumulativeCountEncoder.")
     data["dt_proposta"] = pd.to_datetime(data["dt_proposta"], dayfirst=True)
     transformer = CumulativeCountEncoder(
-        group_by_cols=["nr_documento_segurado"], 
-        sort_col=["dt_proposta", "id_proposta"]
+        group_by_cols=["nr_documento_segurado"], sort_col=["dt_proposta", "id_proposta"]
     )
     transformer.fit(data)
     data_transformed = transformer.transform(data)
@@ -52,8 +54,10 @@ if __name__ == "__main__":
         columns={"nr_previous_['dt_proposta', 'id_proposta']": "nr_previous_proposals"},
         inplace=True,
     )
-    logging.info(f"Data shape after cumulative count encoding: {data_transformed.shape}")
-    
+    logging.info(
+        f"Data shape after cumulative count encoding: {data_transformed.shape}"
+    )
+
     # Cumulative operation encoding for each column in value_columns
     for c in cols_dict["value_columns"]:
         logging.info(f"Processing column: {c} with CumulativeEncoder.")
@@ -66,23 +70,25 @@ if __name__ == "__main__":
         encoder.fit(data)
         td = encoder.transform(data)
         tdata.append(td)
-    
+
     # Concatenate all cumulative encoded data
     logging.info("Concatenating cumulative operation encoded data.")
     tdata = pd.concat(tdata, axis=1)
     tdata = tdata.loc[:, ~tdata.columns.duplicated()]  # Remove duplicated columns
-    
+
     # Log missing data after encoding
     log_missing_data(tdata, "Cumulative Encoded Data")
 
     # Join transformed data
-    logging.info("Joining cumulative count encoded data and cumulative operation encoded data.")
+    logging.info(
+        "Joining cumulative count encoded data and cumulative operation encoded data."
+    )
     data = pd.concat([data_transformed, tdata], axis=1)
     data = data.loc[:, ~data.columns.duplicated()]
-    
+
     # Log missing data after joining
     log_missing_data(data, "Joined Data")
-    
+
     # Feature engineering
     logging.info("Applying feature engineering on valor_indenizacao.")
     data["first_digit"] = data["valor_indenizacao"].astype(str).str[0]

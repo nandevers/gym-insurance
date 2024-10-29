@@ -147,7 +147,7 @@ def main(input_path, output_dir, method):
     data["sample"] = 'train'
     data.loc[data.dt_proposta.dt.year > CUTOFF_YEAR, 'sample'] = 'test'
 
-    cols_to_write = ID_COLS + std_cols + ep_cols + fd_cols + sd_cols + td_cols + ["valor_indenizacao"]
+    cols_to_write = ID_COLS + std_cols + ep_cols + fd_cols + sd_cols + td_cols + ["valor_indenizacao", "sample"]
     save_data(data, cols_to_write, output_dir, CUTOFF_YEAR)
 
 

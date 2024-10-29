@@ -1,8 +1,6 @@
 import pandas as pd
-import logging
-import os
-from constants import DATAPATH, BUDGET_LIST, logger
-from pathlib import Path
+
+from gym_insurance.constants import BUDGET_LIST, DATAPATH, logger
 
 
 def load_data(filename):
@@ -37,19 +35,20 @@ def calculate_metrics_per_episode(episode_df):
     return pd.Series(metrics)
 
 
-def save_analytics(analytics, budget):
-    file_path = DATAPATH / f"episode_analytics_{budget}.paquet"
+def save_analytics(analytics, budget, experiment):
+    file_path = DATAPATH / f"experiment_results/{experiment}/episode_analytics_{budget}.parquet"
     logger.info(f"Saving data to {file_path}")
     analytics.to_parquet(file_path)
 
 
 def main():
-    for b in BUDGET_LIST:
-        logger.info(f"Calculating analytics for {b}")
-        df = load_data(DATAPATH / f"results_{b}.paquet")
-        logger.info(df.head())
-        analytics = analyze_data(df)
-        save_analytics(analytics, budget=b)
+    for experiment in ["random", "dqn"]:
+        for b in BUDGET_LIST:
+            logger.info(f"Calculating analytics for {b}")
+            df = load_data(DATAPATH / f"experiment_results/{experiment}/results_{b}.parquet")
+            logger.info(df.head())
+            analytics = analyze_data(df) 
+            save_analytics(analytics, budget=b, experiment=experiment)
 
 
 if __name__ == "__main__":

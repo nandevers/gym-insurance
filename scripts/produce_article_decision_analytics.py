@@ -1,9 +1,6 @@
 import pandas as pd
-import os
-from constants import DATAPATH, BUDGET_LIST, logger
-from pathlib import Path
 
-DATAPATH = Path("C:\\Repos\\gym-insurance\\experiment_results\\data")
+from gym_insurance.constants import BUDGET_LIST, DATAPATH, logger
 
 
 def load_data(filename):
@@ -38,14 +35,14 @@ def calculate_metrics_per_group(group_df):
 
 
 def save_analytics(analytics, budget):
-    analytics.to_parquet(DATAPATH / f"decision_episode_analytics_{budget}.paquet")
+    analytics.to_parquet(DATAPATH / f"decision_episode_analytics_{budget}.parquet")
 
 
 def main():
     for b in BUDGET_LIST:
         logger.info(f"Calculating Decision Analytics for {b}")
         df = load_data(
-            DATAPATH / f"results_{b}.paquet"
+            DATAPATH / f"experiment_results/results_{b}.parquet"
         )  # Replace with your data file path
         analytics = analyze_data(df)
         save_analytics(analytics, b)

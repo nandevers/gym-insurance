@@ -1,8 +1,9 @@
-import os
-import pandas as pd
 import logging
+import os
 import re
 import unicodedata
+
+import pandas as pd
 
 
 # Function to remove accents/diacritics
@@ -114,8 +115,24 @@ class PSRDataManager:
 
         # Replace commas with dots in all other object-type columns, in case other columns are affected
         for col in df.select_dtypes(include=["object"]).columns:
-        # Avoid re-processing 'valor_indenização'
-            if col  in ['nr_grau_lat', 'nr_min_lat', 'nr_seg_lat', 'nr_grau_long', 'nr_min_long', 'nr_seg_long', 'nr_area_total', 'nr_animal', 'nr_produtividade_estimada', 'nr_produtividade_segurada', 'niveldecobertura'] or 'vl' in col:
+            # Avoid re-processing 'valor_indenização'
+            if (
+                col
+                in [
+                    "nr_grau_lat",
+                    "nr_min_lat",
+                    "nr_seg_lat",
+                    "nr_grau_long",
+                    "nr_min_long",
+                    "nr_seg_long",
+                    "nr_area_total",
+                    "nr_animal",
+                    "nr_produtividade_estimada",
+                    "nr_produtividade_segurada",
+                    "niveldecobertura",
+                ]
+                or "vl" in col
+            ):
                 df[col] = (
                     df[col]
                     .str.replace(",", ".", regex=False)

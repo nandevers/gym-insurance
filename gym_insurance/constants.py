@@ -4,12 +4,9 @@ import logging
 MODELSPATH = Path("./models")
 DATAPATH = Path("./.temp/data")
 
+BUDGET_LIST = [10_000_000, 20_000_000, 30_000_000] 
 
-BUDGET_LIST = [10_000_000] #, 5_000_000, 10_000_000, 15_000_000]
-# BUDGET_LIST = [15_000_000 , 20_000_000, 25_000_000, 30_000_000]
-#BUDGET_LIST = [ 1_000_000, 200_000, 300_000]
-# BUDGET_LIST = [10_000]
-
+# budget_10000000\20241020-125231 Manullay stopped at 
 
 def configure_logging():
     logging.basicConfig(

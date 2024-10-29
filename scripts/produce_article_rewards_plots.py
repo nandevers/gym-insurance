@@ -1,8 +1,9 @@
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import plotly.express as px
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.express as px
+import seaborn as sns
 
 # Define the paths using pathlib for better path handling
 DATAPATH = Path("C:/Repos/gym-insurance/experiment_results/data")
@@ -56,7 +57,7 @@ def rewards_analysis_plots(df):
 
 def main():
     b = 1_000_000
-    filename = f"results_{b}.paquet"
+    filename = f"results_{b}.parquet"
     df = load_data(filename)  # Replace with your data file path
     rewards_analysis_plots(df)
 

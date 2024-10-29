@@ -13,7 +13,7 @@
         "cd_geocmu",
         "nr_produtividade_estimada",
         "nr_documento_segurado",
-        "id_proposta"
+        "id_proposta",
     ],
     "code_id_cols": [
         "cd_processo_susep",
@@ -22,7 +22,7 @@
         "cd_geocmu",
         "nr_produtividade_estimada",
         "nr_documento_segurado",
-        "id_proposta"
+        "id_proposta",
     ],
     "int_cols": [
         "nr_min_lat",
@@ -36,14 +36,9 @@
         "nr_decimal_latitude",
         "nr_decimal_longitude",
         "nr_animal",
-        "ano_apolice"
+        "ano_apolice",
     ],
-    "date_cols": [
-        "dt_apolice",
-        "dt_proposta",
-        "dt_inicio_vigencia",
-        "dt_fim_vigencia"
-    ],
+    "date_cols": ["dt_apolice", "dt_proposta", "dt_inicio_vigencia", "dt_fim_vigencia"],
     "lat_long_cols": [
         "nr_min_lat",
         "nr_seg_lat",
@@ -54,7 +49,7 @@
         "latitude",
         "nr_seg_long",
         "nr_decimal_latitude",
-        "nr_decimal_longitude"
+        "nr_decimal_longitude",
     ],
     "value_columns": [
         "nr_produtividade_segurada",
@@ -64,6 +59,6 @@
         "vl_limite_garantia",
         "vl_subvencao_federal",
         "niveldecobertura",
-        "pe_taxa"
-    ]
+        "pe_taxa",
+    ],
 }
