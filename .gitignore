@@ -138,3 +138,31 @@ dmypy.json
 experiment_results/*
 events*
 .temp/*
+
+# Corrected development and private peer-review additions
+__pycache__/
+.pytest_cache/
+*.pyc
+*.egg-info/
+artifacts/
+data/
+.venv/
+build/
+dist/
+
+# Local-only research, historical checkouts and raw records
+.local/
+*.log
+*.parquet
+.ipynb_checkpoints/
+.vscode/
+
+# Private peer-review correspondence and mailbox exports
+*.eml
+*.mbox
+*.msg
+/reviews-private/
+/plos-review-private/
+
+# Only explicit synthetic fixtures may be versioned
+!fixtures/SYNTHETIC.csv
