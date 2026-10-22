@@ -14,3 +14,10 @@ dist/
 *.parquet
 .ipynb_checkpoints/
 .vscode/
+
+# Private peer-review correspondence and mailbox exports
+*.eml
+*.mbox
+*.msg
+/reviews-private/
+/plos-review-private/
