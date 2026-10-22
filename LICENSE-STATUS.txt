@@ -1,0 +1,5 @@
+NO OPERATIVE LICENSE GRANT IS CREATED BY THIS NOTICE.
+
+The historical setup contains an MIT license classifier. An authoritative operative LICENSE text and verified rights grant were not found during this audit. A classifier is insufficient to establish redistribution permissions. This review package therefore preserves attribution without inventing or replacing a license grant.
+
+This is a PRIVATE identified code-review candidate for the user and authorized collaborators. It is not certified for public release, anonymous submission, or third-party redistribution. Obtain the rights holders' confirmation, preserve required notices, and resolve applicable employer/coauthor obligations before any external release. The included wheel contains the project's own Python code; third-party dependency binaries are not included.

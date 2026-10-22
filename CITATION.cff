@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "Private identified review candidate. Confirm author attribution and permission before public release or citation."
+type: software
+title: "gym-insurance: retrospective Benford-proxy selection benchmark (private review candidate)"
+version: 0.2.0.dev0
+authors:
+  - family-names: Barbosa
+    given-names: Fernando
+repository-code: "https://github.com/nandevers/gym-insurance"
+abstract: "Local review candidate derived from the historical repository; this version has not been pushed or published. Research collaboration attribution is recorded separately in ATTRIBUTION.txt."

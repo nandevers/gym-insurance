@@ -1,0 +1,7 @@
+Private review attribution record, 22 October 2026.
+
+The historical software setup identifies Fernando Barbosa as its author. That attribution is preserved in pyproject.toml and the provisional software citation. The existing research manuscript identifies Fernando Barbosa and Stanley Robson de Medeiros Oliveira with equal contributions. This record preserves that research attribution; it does not assign new software authorship or certify rights ownership.
+
+The modern implementation was prepared locally for Fernando's review, alongside preserved legacy Python modules. Legacy/source notebooks and data are excluded from this bundle. Source lineage is recorded in provenance/source-lineage.json. Third-party dependencies are referenced, not redistributed as binaries. Review their own licenses when installing them.
+
+No authorship, licensing, employer disclosure, journal submission or public-release clearance is inferred from this private bundle. Coauthor and rights review remain required before external distribution.
