@@ -1,0 +1,6 @@
+The historical software identifies Fernando Barbosa as author; that attribution
+is preserved. The underlying InsurEnv research includes collaboration with Stanley
+Robson de Medeiros Oliveira. Research authorship and contributions for a future
+article require a separate contribution audit. This record does not assign new
+software authorship, certify rights ownership or alter existing contributor notices.
+Third-party dependencies retain their own authorship and licensing requirements.

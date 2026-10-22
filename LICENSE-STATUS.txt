@@ -1,0 +1,8 @@
+LICENSE STATUS — DEVELOPMENT PREVIEW
+
+No new operative license grant is created by this notice. Historical documentation
+and package metadata used an MIT label/classifier, but an authoritative operative
+LICENSE text and confirmed rights statement were not located in the current audit.
+Existing attribution is preserved. Confirmation of applicable software/data rights
+and the final release license is tracked in issue #4. Do not treat a badge as a
+verified license grant or redistribute third-party dependency binaries here.
